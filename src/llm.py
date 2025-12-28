@@ -23,7 +23,9 @@ def generate_digest(text: str) -> Dict[str, str]:
 
     if OpenAI and api_key:
         try:
-            # Ignore proxy-related envs to avoid unsupported 'proxies' argument
+            # Clean proxy envs that may be injected into client kwargs
+            for k in ["OPENAI_PROXY", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
+                os.environ.pop(k, None)
             client = OpenAI(api_key=api_key)
             prompt = (
                 "请用中文总结下面内容，输出两部分：\n"

@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 from notion_client import Client
@@ -40,8 +40,22 @@ def build_props_config() -> Dict[str, str]:
     }
 
 
-def query_database(client: Client, database_id: str, **body: Any) -> Dict[str, Any]:
-    """Compat helper for databases query (avoids missing .query attr across versions)."""
+def query_database(client: Client, database_id: str, data_source_id: Optional[str], **body: Any) -> Dict[str, Any]:
+    """Compat helper for query.
+
+    - If NOTION_DATA_SOURCE_ID is set, try data_sources/{id}/query (for synced DB).
+    - Otherwise use databases/{id}/query.
+    """
+    if data_source_id:
+        try:
+            return client.request(
+                path=f"data_sources/{data_source_id}/query",
+                method="post",
+                body=body,
+            )
+        except Exception:
+            # Fall back to database query if data_source query fails
+            pass
     return client.request(
         path=f"databases/{database_id}/query",
         method="post",
@@ -49,8 +63,8 @@ def query_database(client: Client, database_id: str, **body: Any) -> Dict[str, A
     )
 
 
-def cmd_list(client: Client, database_id: str, props: Dict[str, str], limit: int) -> None:
-    resp = query_database(client, database_id, page_size=limit)
+def cmd_list(client: Client, database_id: str, data_source_id: Optional[str], props: Dict[str, str], limit: int) -> None:
+    resp = query_database(client, database_id, data_source_id, page_size=limit)
     results: List[Dict[str, Any]] = resp.get("results", [])
     print(f"Found {len(results)} items (showing up to {limit}):")
     for page in results:
@@ -91,6 +105,7 @@ def main() -> None:
     load_dotenv()
     token = get_env("NOTION_TOKEN", required=True)
     database_id = get_env("NOTION_DATABASE_ID", required=True)
+    data_source_id = os.getenv("NOTION_DATA_SOURCE_ID")
     props = build_props_config()
     client = Client(auth=token)
 
@@ -115,7 +130,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.cmd == "list":
-        cmd_list(client, database_id, props, args.limit)
+        cmd_list(client, database_id, data_source_id, props, args.limit)
     elif args.cmd == "create":
         cmd_create(client, database_id, props, args.title, args.url, args.summary)
     elif args.cmd == "update-status":

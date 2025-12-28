@@ -29,18 +29,8 @@ def get_env(name: str, required: bool = False) -> str | None:
 def build_updates() -> Dict[str, Dict]:
     """Define the schema fields to ensure exist (idempotent)."""
     updates: Dict[str, Dict] = {
-        "Status": {
-            "status": {
-                "options": [
-                    {"name": "To Read"},
-                    {"name": "pending"},
-                    {"name": "ready"},
-                    {"name": "excluded"},
-                    {"name": "Error"},
-                    {"name": "unprocessed"},
-                ]
-            }
-        },
+        # 注意：data_sources patch 不接受 status.options，保留空对象
+        "Status": {"status": {}},
         "URL": {"url": {}},
         "Files": {"files": {}},
         "Summary": {"rich_text": {}},
@@ -105,7 +95,7 @@ def main() -> None:
 
     except APIResponseError as e:
         print(f"\n❌ API 请求失败: {e.code}")
-        print(f"   消息: {e.message}")
+        print(json.dumps(e.body, indent=2, ensure_ascii=False))
     except Exception as e:
         print(f"\n❌ 其他异常: {e}")
         raise

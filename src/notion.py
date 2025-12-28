@@ -60,6 +60,14 @@ class NotionManager:
             prompt_version=get_env("NOTION_PROP_PROMPT_VERSION", PropertyNames.prompt_version),
         )
 
+    def _query(self, body: Dict[str, Any]) -> Dict[str, Any]:
+        """Compat query helper for databases without .query convenience."""
+        return self.client.request(
+            path=f"databases/{self.database_id}/query",
+            method="post",
+            body=body,
+        )
+
     def _simplify_page(self, page: Dict[str, Any]) -> Dict[str, Any]:
         props = page.get("properties", {})
         url = props.get(self.prop.url, {}).get("url")
@@ -86,28 +94,26 @@ class NotionManager:
 
     def get_pending_tasks(self) -> List[Dict[str, Any]]:
         """Fetch pages whose status is To Read/pending/unprocessed."""
-        resp = self.client.databases.query(
-            **{
-                "database_id": self.database_id,
+        resp = self._query(
+            {
                 "filter": {
                     "or": [
                         {"property": self.prop.status, "status": {"equals": self.status.to_read}},
                         {"property": self.prop.status, "status": {"equals": self.status.pending}},
                         {"property": self.prop.status, "status": {"equals": self.status.unprocessed}},
                     ]
-                },
+                }
             }
         )
         return [self._simplify_page(p) for p in resp.get("results", [])]
 
     def find_by_canonical(self, canonical_url: str) -> Optional[Dict[str, Any]]:
-        resp = self.client.databases.query(
-            **{
-                "database_id": self.database_id,
+        resp = self._query(
+            {
                 "filter": {
                     "property": self.prop.canonical_url,
                     "url": {"equals": canonical_url},
-                },
+                }
             }
         )
         results = resp.get("results", [])
@@ -159,10 +165,19 @@ class NotionManager:
         }
         self._update_status(page_id, self.status.excluded, props)
 
-    def fetch_ready_for_digest(self, since: Optional[str], until: Optional[str]) -> List[Dict[str, Any]]:
+    def fetch_ready_for_digest(
+        self,
+        since: Optional[str],
+        until: Optional[str],
+        include_private: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Fetch items ready for digest, with optional date window and sensitivity gating."""
         filters: List[Dict[str, Any]] = [
             {"property": self.prop.status, "status": {"equals": self.status.ready}},
         ]
+        if not include_private:
+            filters.append({"property": self.prop.sensitivity, "select": {"does_not_equal": "private"}})
+
         if since or until:
             # Assume Created time for now; adjust to a date property if schema differs
             date_filter: Dict[str, Any] = {"timestamp": "created_time", "created_time": {}}
@@ -171,12 +186,8 @@ class NotionManager:
             if until:
                 date_filter["created_time"]["on_or_before"] = until
             filters.append(date_filter)
-        resp = self.client.databases.query(
-            **{
-                "database_id": self.database_id,
-                "filter": {"and": filters},
-            }
-        )
+
+        resp = self._query({"filter": {"and": filters}})
         return [self._simplify_page(p) for p in resp.get("results", [])]
 
     def set_duplicate_of(self, page_id: str, canonical_id: str, note: str) -> None:

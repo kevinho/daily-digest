@@ -18,7 +18,8 @@ class FakeNotion:
         self.record["classified"] = kwargs
 
     def mark_as_done(self, page_id, summary, status=None):
-        self.record["marked"].append(("done", page_id, summary, status))
+        status_val = status or self.status.ready
+        self.record["marked"].append(("done", page_id, summary, status_val))
 
     def mark_unprocessed(self, page_id, note):
         self.record["marked"].append(("unprocessed", page_id, note))

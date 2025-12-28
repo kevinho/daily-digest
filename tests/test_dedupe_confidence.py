@@ -35,7 +35,8 @@ class FakeNotion:
         self.record["classified"] = kwargs
 
     def mark_as_done(self, page_id, summary, status=None):
-        self.record["marked"].append(("done", page_id, summary, status))
+        status_val = status or self.status.ready
+        self.record["marked"].append(("done", page_id, summary, status_val))
 
     def mark_unprocessed(self, page_id, note):
         self.record["marked"].append(("unprocessed", page_id, note))
@@ -44,8 +45,7 @@ class FakeNotion:
         self.record["marked"].append(("error", page_id, note))
 
 
-@pytest.mark.asyncio
-async def test_process_item_low_confidence(monkeypatch):
+def test_process_item_low_confidence(monkeypatch):
     fake = FakeNotion()
     # Force threshold to 0.5
     monkeypatch.setenv("CONFIDENCE_THRESHOLD", "0.5")

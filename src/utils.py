@@ -21,5 +21,15 @@ def configure_logging() -> None:
 
 
 def get_timezone() -> timezone:
-    # Placeholder: Python tz handling can be added later; default to UTC
+    """
+    Resolve timezone from env TIMEZONE (e.g., Asia/Shanghai), fallback to UTC.
+    """
+    tz_name = os.getenv("TIMEZONE")
+    if tz_name:
+        try:
+            from zoneinfo import ZoneInfo
+
+            return ZoneInfo(tz_name)
+        except Exception:
+            pass
     return timezone.utc

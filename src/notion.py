@@ -19,6 +19,7 @@ class StatusNames:
 
 @dataclass(frozen=True)
 class PropertyNames:
+    title: str = "Name"
     status: str = "Status"
     url: str = "URL"
     summary: str = "Summary"
@@ -50,6 +51,7 @@ class NotionManager:
         )
 
         self.prop = PropertyNames(
+            title=get_env("NOTION_PROP_TITLE", PropertyNames.title),
             status=get_env("NOTION_PROP_STATUS", PropertyNames.status),
             url=get_env("NOTION_PROP_URL", PropertyNames.url),
             summary=get_env("NOTION_PROP_SUMMARY", PropertyNames.summary),
@@ -91,6 +93,8 @@ class NotionManager:
         props = page.get("properties", {})
         url = props.get(self.prop.url, {}).get("url")
         files_prop = props.get(self.prop.files, {})
+        title_prop = props.get(self.prop.title, {})
+        summary_prop = props.get(self.prop.summary, {})
         attachments: List[str] = []
         if isinstance(files_prop, dict) and "files" in files_prop:
             for f in files_prop.get("files", []):
@@ -99,6 +103,25 @@ class NotionManager:
                     link = f[ftype].get("url")
                     if link:
                         attachments.append(link)
+        title_text = ""
+        if isinstance(title_prop, dict):
+            titems = title_prop.get("title", [])
+            if titems:
+                title_text = titems[0].get("plain_text", "") or titems[0].get("text", {}).get("content", "")
+        summary_text = ""
+        if isinstance(summary_prop, dict):
+            sitems = summary_prop.get("rich_text", [])
+            if sitems:
+                summary_text = sitems[0].get("plain_text", "") or sitems[0].get("text", {}).get("content", "")
+
+        tags_prop = props.get(self.prop.tags, {})
+        tags: List[str] = []
+        if isinstance(tags_prop, dict):
+            for t in tags_prop.get("multi_select", []) or []:
+                name = t.get("name")
+                if name:
+                    tags.append(name)
+
         status_prop = props.get(self.prop.status, {})
         status_name = None
         if "status" in status_prop and isinstance(status_prop["status"], dict):
@@ -108,6 +131,9 @@ class NotionManager:
             "url": url,
             "attachments": attachments,
             "status": status_name,
+             "title": title_text,
+             "summary": summary_text,
+             "tags": tags,
             "raw": page,
         }
 

@@ -24,6 +24,7 @@ def main() -> None:
     token = get_env("NOTION_TOKEN")
     database_id = get_env("NOTION_DATABASE_ID")
     notion_version = os.getenv("NOTION_VERSION", "2022-06-28")
+    data_source_id = os.getenv("NOTION_DATA_SOURCE_ID")
 
     # 1. 定义字段映射 (Property Names)
     prop_names = {
@@ -49,6 +50,9 @@ def main() -> None:
         "error": os.getenv("NOTION_STATUS_ERROR", "Error"),
         "unprocessed": os.getenv("NOTION_STATUS_UNPROCESSED", "unprocessed"),
     }
+
+    if not data_source_id:
+        raise RuntimeError("Missing NOTION_DATA_SOURCE_ID (Manage data sources -> Copy data source ID)")
 
     client = Client(auth=token, notion_version=notion_version)
     print(f"🔄 正在连接数据库: {database_id} ... (version={notion_version})")
@@ -136,8 +140,13 @@ def main() -> None:
             print("✨ 数据库 Schema 已是最新，无需更新。")
         else:
             print(f"🛠 正在新增 {len(properties_to_update)} 个字段: {list(properties_to_update.keys())} ...")
-            result = client.databases.update(database_id=database_id, properties=properties_to_update)
-            print("✅ Schema 更新成功！")
+            # 使用 data_sources/{id} patch 方式更新 schema，兼容新版 API
+            result = client.request(
+                path=f"data_sources/{data_source_id}",
+                method="patch",
+                body={"properties": properties_to_update},
+            )
+            print("✅ Schema 更新成功！（data_sources patch）")
             print(json.dumps(result, indent=2, ensure_ascii=False))
 
     except APIResponseError as e:

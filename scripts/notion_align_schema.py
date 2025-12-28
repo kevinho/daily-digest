@@ -68,18 +68,8 @@ def main() -> None:
 
         # --- Status (使用 Select 类型以支持自定义选项) ---
         if prop_names["status"] not in current_props:
-            properties_to_update[prop_names["status"]] = {
-                "select": {
-                    "options": [
-                        {"name": status_opts["to_read"], "color": "blue"},
-                        {"name": status_opts["pending"], "color": "yellow"},
-                        {"name": status_opts["ready"], "color": "green"},
-                        {"name": status_opts["excluded"], "color": "gray"},
-                        {"name": status_opts["error"], "color": "red"},
-                        {"name": status_opts["unprocessed"], "color": "default"},
-                    ]
-                }
-            }
+            # data_sources patch 不接受 status.options，这里留空
+            properties_to_update[prop_names["status"]] = {"status": {}}
 
         # --- URL ---
         if prop_names["url"] not in current_props:
@@ -121,9 +111,8 @@ def main() -> None:
         if prop_names["duplicate_of"] not in current_props:
             properties_to_update[prop_names["duplicate_of"]] = {
                 "relation": {
-                    "database_id": database_id,
-                    "type": "dual_property",
-                    "dual_property": {},
+                    "data_source_id": data_source_id,
+                    "single_property": {},
                 }
             }
 

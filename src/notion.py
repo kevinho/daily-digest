@@ -69,6 +69,10 @@ class NotionManager:
             path = f"databases/{self.database_id}/query"
         return self.client.request(path=path, method="post", body=body)
 
+    def _status_filter(self, name: str) -> Dict[str, Any]:
+        """Use select filter to stay compatible with DBs whose Status is select."""
+        return {"property": self.prop.status, "select": {"equals": name}}
+
     def _simplify_page(self, page: Dict[str, Any]) -> Dict[str, Any]:
         props = page.get("properties", {})
         url = props.get(self.prop.url, {}).get("url")
@@ -99,9 +103,9 @@ class NotionManager:
             {
                 "filter": {
                     "or": [
-                        {"property": self.prop.status, "status": {"equals": self.status.to_read}},
-                        {"property": self.prop.status, "status": {"equals": self.status.pending}},
-                        {"property": self.prop.status, "status": {"equals": self.status.unprocessed}},
+                        self._status_filter(self.status.to_read),
+                        self._status_filter(self.status.pending),
+                        self._status_filter(self.status.unprocessed),
                     ]
                 }
             }
@@ -174,7 +178,7 @@ class NotionManager:
     ) -> List[Dict[str, Any]]:
         """Fetch items ready for digest, with optional date window and sensitivity gating."""
         filters: List[Dict[str, Any]] = [
-            {"property": self.prop.status, "status": {"equals": self.status.ready}},
+            self._status_filter(self.status.ready),
         ]
         if not include_private:
             filters.append({"property": self.prop.sensitivity, "select": {"does_not_equal": "private"}})

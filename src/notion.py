@@ -74,6 +74,10 @@ class NotionManager:
         """Use select filter to stay compatible with DBs whose Status is select."""
         return {"property": self.prop.status, "select": {"equals": name}}
 
+    def _status_empty_filter(self) -> Dict[str, Any]:
+        """Match rows with empty Status."""
+        return {"property": self.prop.status, "select": {"is_empty": True}}
+
     def _simplify_page(self, page: Dict[str, Any]) -> Dict[str, Any]:
         props = page.get("properties", {})
         url = props.get(self.prop.url, {}).get("url")
@@ -107,6 +111,7 @@ class NotionManager:
                         self._status_filter(self.status.to_read),
                         self._status_filter(self.status.pending),
                         self._status_filter(self.status.unprocessed),
+                        self._status_empty_filter(),
                     ]
                 }
             }

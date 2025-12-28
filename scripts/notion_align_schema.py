@@ -1,27 +1,17 @@
 #!/usr/bin/env python3
 """
 Align Notion database schema for Personal Content Digest.
-
-Requires environment variables:
-- NOTION_TOKEN
-- NOTION_DATABASE_ID
-
-Optional overrides (if your column names differ):
-- NOTION_PROP_STATUS, NOTION_PROP_URL, NOTION_PROP_FILES, NOTION_PROP_SUMMARY,
-  NOTION_PROP_CONFIDENCE, NOTION_PROP_SENSITIVITY, NOTION_PROP_TAGS,
-  NOTION_PROP_CANONICAL_URL, NOTION_PROP_DUPLICATE_OF,
-  NOTION_PROP_RULE_VERSION, NOTION_PROP_PROMPT_VERSION
-- NOTION_STATUS_* for status option names (pending/ready/excluded/Error/unprocessed/To Read)
+(Safe Version: Checks existing columns before updating)
 """
 
 from __future__ import annotations
 
 import os
-from typing import Dict
+import json
+from typing import Dict, Any
 
 from dotenv import load_dotenv
-from notion_client import Client
-
+from notion_client import Client, APIResponseError
 
 def get_env(name: str, default: str | None = None) -> str:
     val = os.getenv(name, default)
@@ -29,14 +19,14 @@ def get_env(name: str, default: str | None = None) -> str:
         raise RuntimeError(f"Missing required env: {name}")
     return val
 
-
 def main() -> None:
     load_dotenv()
     token = get_env("NOTION_TOKEN")
     database_id = get_env("NOTION_DATABASE_ID")
+    notion_version = os.getenv("NOTION_VERSION", "2022-06-28")
 
-    # Property names (overridable)
-    prop = {
+    # 1. 定义字段映射 (Property Names)
+    prop_names = {
         "status": os.getenv("NOTION_PROP_STATUS", "Status"),
         "url": os.getenv("NOTION_PROP_URL", "URL"),
         "files": os.getenv("NOTION_PROP_FILES", "Files"),
@@ -50,58 +40,110 @@ def main() -> None:
         "prompt_version": os.getenv("NOTION_PROP_PROMPT_VERSION", "Prompt Version"),
     }
 
-    # Status options (overridable)
+    # 2. 定义状态选项 (Status Options)
     status_opts = {
+        "to_read": os.getenv("NOTION_STATUS_TO_READ", "To Read"),
         "pending": os.getenv("NOTION_STATUS_PENDING", "pending"),
         "ready": os.getenv("NOTION_STATUS_READY", "ready"),
         "excluded": os.getenv("NOTION_STATUS_EXCLUDED", "excluded"),
         "error": os.getenv("NOTION_STATUS_ERROR", "Error"),
         "unprocessed": os.getenv("NOTION_STATUS_UNPROCESSED", "unprocessed"),
-        "to_read": os.getenv("NOTION_STATUS_TO_READ", "To Read"),
     }
 
-    notion = Client(auth=token)
+    client = Client(auth=token, notion_version=notion_version)
+    print(f"🔄 正在连接数据库: {database_id} ... (version={notion_version})")
 
-    properties: Dict[str, Dict] = {
-        prop["status"]: {
-            "status": {
-                "options": [
-                    {"name": status_opts["to_read"]},
-                    {"name": status_opts["pending"]},
-                    {"name": status_opts["ready"]},
-                    {"name": status_opts["excluded"]},
-                    {"name": status_opts["error"]},
-                    {"name": status_opts["unprocessed"]},
-                ]
+    try:
+        # 3. 获取当前数据库 Schema，做差异对比
+        current_db = client.databases.retrieve(database_id=database_id)
+        current_props = current_db.get("properties", {})
+        print(f"✅ 连接成功。当前包含字段: {list(current_props.keys())}")
+
+        properties_to_update: Dict[str, Any] = {}
+
+        # 4. 构建更新 Payload (只添加不存在的字段)
+
+        # --- Status (使用 Select 类型以支持自定义选项) ---
+        if prop_names["status"] not in current_props:
+            properties_to_update[prop_names["status"]] = {
+                "select": {
+                    "options": [
+                        {"name": status_opts["to_read"], "color": "blue"},
+                        {"name": status_opts["pending"], "color": "yellow"},
+                        {"name": status_opts["ready"], "color": "green"},
+                        {"name": status_opts["excluded"], "color": "gray"},
+                        {"name": status_opts["error"], "color": "red"},
+                        {"name": status_opts["unprocessed"], "color": "default"},
+                    ]
+                }
             }
-        },
-        prop["url"]: {"url": {}},
-        prop["files"]: {"files": {}},
-        prop["summary"]: {"rich_text": {}},
-        prop["confidence"]: {"number": {}},
-        prop["sensitivity"]: {
-            "select": {
-                "options": [
-                    {"name": "public"},
-                    {"name": "internal"},
-                    {"name": "private"},
-                ]
+
+        # --- URL ---
+        if prop_names["url"] not in current_props:
+            properties_to_update[prop_names["url"]] = {"url": {}}
+
+        # --- Files ---
+        if prop_names["files"] not in current_props:
+            properties_to_update[prop_names["files"]] = {"files": {}}
+
+        # --- Summary (Rich Text) ---
+        if prop_names["summary"] not in current_props:
+            properties_to_update[prop_names["summary"]] = {"rich_text": {}}
+
+        # --- Confidence (Number) ---
+        if prop_names["confidence"] not in current_props:
+            properties_to_update[prop_names["confidence"]] = {"number": {"format": "number"}}
+
+        # --- Sensitivity (Select) ---
+        if prop_names["sensitivity"] not in current_props:
+            properties_to_update[prop_names["sensitivity"]] = {
+                "select": {
+                    "options": [
+                        {"name": "public", "color": "green"},
+                        {"name": "internal", "color": "yellow"},
+                        {"name": "private", "color": "red"},
+                    ]
+                }
             }
-        },
-        prop["tags"]: {"multi_select": {}},
-        prop["canonical_url"]: {"url": {}},
-        prop["duplicate_of"]: {"relation": {"database_id": database_id, "type": "single_property"}},
-        prop["rule_version"]: {"rich_text": {}},
-        prop["prompt_version"]: {"rich_text": {}},
-    }
 
-    result = notion.databases.update(database_id=database_id, properties=properties)
-    import json
+        # --- Tags (Multi-Select) ---
+        if prop_names["tags"] not in current_props:
+            properties_to_update[prop_names["tags"]] = {"multi_select": {}}
 
-    print("Schema alignment response:")
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+        # --- Canonical URL ---
+        if prop_names["canonical_url"] not in current_props:
+            properties_to_update[prop_names["canonical_url"]] = {"url": {}}
+
+        # --- Duplicate Of (Relation - Self Referencing) ---
+        if prop_names["duplicate_of"] not in current_props:
+            properties_to_update[prop_names["duplicate_of"]] = {
+                "relation": {
+                    "database_id": database_id,
+                    "type": "dual_property",
+                    "dual_property": {},
+                }
+            }
+
+        # --- Versions ---
+        if prop_names["rule_version"] not in current_props:
+            properties_to_update[prop_names["rule_version"]] = {"rich_text": {}}
+
+        if prop_names["prompt_version"] not in current_props:
+            properties_to_update[prop_names["prompt_version"]] = {"rich_text": {}}
+
+        # 5. 执行更新
+        if not properties_to_update:
+            print("✨ 数据库 Schema 已是最新，无需更新。")
+        else:
+            print(f"🛠 正在新增 {len(properties_to_update)} 个字段: {list(properties_to_update.keys())} ...")
+            result = client.databases.update(database_id=database_id, properties=properties_to_update)
+            print("✅ Schema 更新成功！")
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+
+    except APIResponseError as e:
+        print(f"❌ 更新失败: {e}")
+        print("提示：如果提示字段类型冲突，请先在 Notion 网页端删除该同名字段，再运行此脚本。")
 
 
 if __name__ == "__main__":
     main()
-

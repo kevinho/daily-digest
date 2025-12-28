@@ -35,6 +35,7 @@ class NotionManager:
     def __init__(self) -> None:
         token = get_env("NOTION_TOKEN", required=True)
         self.database_id = get_env("NOTION_DATABASE_ID", required=True)
+        self.data_source_id = get_env("NOTION_DATA_SOURCE_ID", required=False)
         self.client = Client(auth=token)
 
         self.status = StatusNames(
@@ -62,11 +63,11 @@ class NotionManager:
 
     def _query(self, body: Dict[str, Any]) -> Dict[str, Any]:
         """Compat query helper for databases without .query convenience."""
-        return self.client.request(
-            path=f"databases/{self.database_id}/query",
-            method="post",
-            body=body,
-        )
+        if self.data_source_id:
+            path = f"data_sources/{self.data_source_id}/query"
+        else:
+            path = f"databases/{self.database_id}/query"
+        return self.client.request(path=path, method="post", body=body)
 
     def _simplify_page(self, page: Dict[str, Any]) -> Dict[str, Any]:
         props = page.get("properties", {})

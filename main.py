@@ -18,8 +18,12 @@ def is_attachment_unprocessed(url: str) -> bool:
 def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
     page_id = page.get("id", "")
     url = page.get("url")
+    attachments = page.get("attachments", [])
     if not url:
-        notion.mark_as_error(page_id, "missing url")
+        if attachments:
+            notion.mark_unprocessed(page_id, "Attachment stored; no URL; OCR out of scope; excluded from digests")
+        else:
+            notion.mark_as_error(page_id, "missing url")
         return
 
     # Dedupe by canonical URL

@@ -23,6 +23,7 @@ class PropertyNames:
     summary: str = "Summary"
     confidence: str = "Confidence"
     sensitivity: str = "Sensitivity"
+    files: str = "Files"
     canonical_url: str = "Canonical URL"
     duplicate_of: str = "Duplicate Of"
     tags: str = "Tags"
@@ -51,6 +52,7 @@ class NotionManager:
             summary=get_env("NOTION_PROP_SUMMARY", PropertyNames.summary),
             confidence=get_env("NOTION_PROP_CONFIDENCE", PropertyNames.confidence),
             sensitivity=get_env("NOTION_PROP_SENSITIVITY", PropertyNames.sensitivity),
+            files=get_env("NOTION_PROP_FILES", PropertyNames.files),
             canonical_url=get_env("NOTION_PROP_CANONICAL_URL", PropertyNames.canonical_url),
             duplicate_of=get_env("NOTION_PROP_DUPLICATE_OF", PropertyNames.duplicate_of),
             tags=get_env("NOTION_PROP_TAGS", PropertyNames.tags),
@@ -61,6 +63,15 @@ class NotionManager:
     def _simplify_page(self, page: Dict[str, Any]) -> Dict[str, Any]:
         props = page.get("properties", {})
         url = props.get(self.prop.url, {}).get("url")
+        files_prop = props.get(self.prop.files, {})
+        attachments: List[str] = []
+        if isinstance(files_prop, dict) and "files" in files_prop:
+            for f in files_prop.get("files", []):
+                ftype = f.get("type")
+                if ftype and isinstance(f.get(ftype), dict):
+                    link = f[ftype].get("url")
+                    if link:
+                        attachments.append(link)
         status_prop = props.get(self.prop.status, {})
         status_name = None
         if "status" in status_prop and isinstance(status_prop["status"], dict):
@@ -68,6 +79,7 @@ class NotionManager:
         return {
             "id": page.get("id"),
             "url": url,
+            "attachments": attachments,
             "status": status_name,
             "raw": page,
         }

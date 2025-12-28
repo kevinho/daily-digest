@@ -5,12 +5,6 @@ CHROME_BIN=${CHROME_BIN:-"/Applications/Google Chrome.app/Contents/MacOS/Google 
 USER_DATA_DIR=${USER_DATA_DIR:-"/Users/hechangbin/Library/Application Support/Google/Chrome"}
 DEBUG_PORT=${DEBUG_PORT:-9222}
 
-if [ ! -x "$CHROME_BIN" ]; then
-  echo "Chrome binary not found at $CHROME_BIN" >&2
-  exit 1
-fi
-
-mkdir -p "$USER_DATA_DIR"
 "$CHROME_BIN" \
   --remote-debugging-port="$DEBUG_PORT" \
   --user-data-dir="$USER_DATA_DIR" \

@@ -85,6 +85,12 @@ def main(digest_window: Optional[str] = None) -> None:
         ready = notion.fetch_ready_for_digest(since=None, until=None, include_private=False)
         digest_payload = build_digest(ready)
         logging.info("Digest built with %d sections, %d citations", len(digest_payload["sections"]), len(digest_payload["citations"]))
+        digest_title = f"Digest ({digest_window})"
+        page_id = notion.create_digest_page(digest_title, digest_payload["sections"], digest_payload["citations"])
+        if page_id:
+            logging.info("Digest page created: %s", page_id)
+        else:
+            logging.warning("NOTION_DIGEST_PARENT_ID not set; digest page not created")
 
 
 if __name__ == "__main__":

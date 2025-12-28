@@ -36,6 +36,7 @@ class NotionManager:
         token = get_env("NOTION_TOKEN", required=True)
         self.database_id = get_env("NOTION_DATABASE_ID", required=True)
         self.data_source_id = get_env("NOTION_DATA_SOURCE_ID", required=False)
+        self.digest_parent_id = get_env("NOTION_DIGEST_PARENT_ID", required=False)
         self.client = Client(auth=token)
 
         self.status = StatusNames(
@@ -144,6 +145,54 @@ class NotionManager:
 
     def _update_status(self, page_id: str, status: str, extra_props: Optional[Dict[str, Any]] = None) -> None:
         self._set_status(page_id, status, extra_props)
+
+    def create_digest_page(self, title: str, sections: List[Dict[str, Any]], citations: List[str]) -> Optional[str]:
+        """
+        Write a digest page under a parent page.
+        Requires NOTION_DIGEST_PARENT_ID to be set.
+        """
+        if not self.digest_parent_id:
+            return None
+
+        children_blocks: List[Dict[str, Any]] = []
+        for sec in sections:
+            heading = {
+                "object": "block",
+                "type": "heading_2",
+                "heading_2": {
+                    "rich_text": [{"type": "text", "text": {"content": sec.get("title", "Section")}}],
+                },
+            }
+            summary_text = sec.get("summary", "")
+            body = {
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {"rich_text": [{"type": "text", "text": {"content": summary_text}}]},
+            }
+            children_blocks.extend([heading, body])
+
+        citations_block = {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+                "rich_text": [
+                    {
+                        "type": "text",
+                        "text": {"content": "Citations: " + ", ".join(citations) if citations else "Citations: none"},
+                    }
+                ]
+            },
+        }
+        children_blocks.append(citations_block)
+
+        page = self.client.pages.create(
+            parent={"type": "page_id", "page_id": self.digest_parent_id},
+            properties={
+                "title": {"title": [{"text": {"content": title}}]},
+            },
+            children=children_blocks,
+        )
+        return page.get("id")
 
     def mark_as_done(self, page_id: str, summary: str, status: Optional[str] = None) -> None:
         props = {

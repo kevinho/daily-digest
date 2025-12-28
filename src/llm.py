@@ -18,6 +18,10 @@ def generate_digest(text: str) -> Dict[str, str]:
         # Clean proxy envs before importing openai
         for k in ["OPENAI_PROXY", "OPENAI_HTTP_PROXY", "OPENAI_HTTPS_PROXY", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
             os.environ.pop(k, None)
+        import openai  # type: ignore
+
+        openai.proxy = None
+        openai.proxies = None
         from openai import OpenAI  # type: ignore
     except ImportError:
         OpenAI = None  # type: ignore

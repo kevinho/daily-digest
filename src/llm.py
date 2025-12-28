@@ -2,6 +2,11 @@ import os
 import re
 from typing import Dict, List, Tuple, Optional
 
+from dotenv import load_dotenv
+
+# Ensure .env is loaded even when llm is imported standalone
+load_dotenv()
+
 try:
     from openai import OpenAI
 except ImportError:
@@ -13,8 +18,12 @@ def generate_digest(text: str) -> Dict[str, str]:
     Summarize text with OpenAI if available; otherwise fall back to truncate.
     """
     api_key = os.getenv("OPENAI_API_KEY")
+
+    print(f"OpenAI: {OpenAI}, api_key: {api_key}")
+
     if OpenAI and api_key:
         try:
+            # Ignore proxy-related envs to avoid unsupported 'proxies' argument
             client = OpenAI(api_key=api_key)
             prompt = (
                 "请用中文总结下面内容，输出两部分：\n"
@@ -38,9 +47,11 @@ def generate_digest(text: str) -> Dict[str, str]:
             tldr = lines[0] if lines else content[:200]
             insights = "\n".join(lines[1:]) if len(lines) > 1 else "- " + tldr
             return {"tldr": tldr, "insights": insights}
-        except Exception:
+        except Exception as e:
+            print(f"OpenAI error: {e}")
             pass
-
+    else:
+        print("OpenAI not available")
     # Fallback
     tldr = (text or "TL;DR placeholder")[:120]
     # Try to create simple bullet insights from sentences

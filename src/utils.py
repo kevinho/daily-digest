@@ -1,0 +1,25 @@
+import logging
+import os
+from datetime import timezone
+from typing import Optional
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+def get_env(key: str, default: Optional[str] = None, required: bool = False) -> str:
+    value = os.getenv(key, default)
+    if required and (value is None or value == ""):
+        raise ValueError(f"Missing required env var: {key}")
+    return value
+
+
+def configure_logging() -> None:
+    level = os.getenv("LOG_LEVEL", "INFO").upper()
+    logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+
+
+def get_timezone() -> timezone:
+    # Placeholder: Python tz handling can be added later; default to UTC
+    return timezone.utc

@@ -1,0 +1,4 @@
+## 001-content-digest
+ M .specify/memory/constitution.md
+?? .specify/tmp_status.txt
+?? specs/

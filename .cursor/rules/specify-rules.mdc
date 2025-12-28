@@ -1,0 +1,32 @@
+# daily-digest Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2025-12-28
+
+## Active Technologies
+- Python 3.11 + playwright (CDP connect to Chrome), trafilatura (HTML → text), notion-client (Python SDK), openai (gpt-4o), tenacity/backoff, cron/apscheduler, dotenv (002-content-digest)
+- Notion Database (single DB + derived views); attachments stored in Notion files/links (002-content-digest)
+
+- TypeScript 5.x on Node.js 20 + @notionhq/client; OpenAI SDK (gpt-4o) for summarization; node-cron for schedules; date-fns; optional Turndown/markdown-it for HTML → md (002-content-digest)
+
+## Project Structure
+
+```text
+src/
+tests/
+```
+
+## Commands
+
+npm test && npm run lint
+
+## Code Style
+
+TypeScript 5.x on Node.js 20: Follow standard conventions
+
+## Recent Changes
+- 002-content-digest: Added Python 3.11 + playwright (CDP connect to Chrome), trafilatura (HTML → text), notion-client (Python SDK), openai (gpt-4o), tenacity/backoff, cron/apscheduler, dotenv
+
+- 002-content-digest: Added TypeScript 5.x on Node.js 20 + @notionhq/client; OpenAI SDK (gpt-4o) for summarization; node-cron for schedules; date-fns; optional Turndown/markdown-it for HTML → md
+
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->

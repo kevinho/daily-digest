@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.*
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Node/Tools
+node_modules/
+
+# OS/Editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.tmp
+
+# Logs
+*.log
+logs/
+
+# Playwright
+.playwright/
+

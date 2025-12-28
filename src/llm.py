@@ -13,11 +13,21 @@ def generate_digest(text: str) -> Dict[str, str]:
     Summarize text with OpenAI if available; otherwise fall back to truncate.
     """
     api_key = os.getenv("OPENAI_API_KEY")
+    # Clean any proxy envs that might be injected by shell/tools
+    for k in [
+        "OPENAI_PROXY",
+        "OPENAI_HTTP_PROXY",
+        "OPENAI_HTTPS_PROXY",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+    ]:
+        os.environ.pop(k, None)
 
     try:
-        # Clean proxy envs before importing openai
-        for k in ["OPENAI_PROXY", "OPENAI_HTTP_PROXY", "OPENAI_HTTPS_PROXY", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
-            os.environ.pop(k, None)
         import openai  # type: ignore
 
         openai.proxy = None

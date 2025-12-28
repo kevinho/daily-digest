@@ -68,6 +68,7 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
         rule_version=rule_version,
         prompt_version=prompt_version,
         raw_content=text,
+        canonical_url=canonical,
     )
 
     summary = generate_digest(text)

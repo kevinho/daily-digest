@@ -319,6 +319,7 @@ class NotionManager:
         rule_version: str,
         prompt_version: str,
         raw_content: Optional[str] = None,
+        canonical_url: Optional[str] = None,
     ) -> None:
         props: Dict[str, Any] = {
             self.prop.tags: {"multi_select": [{"name": t} for t in tags]},
@@ -329,4 +330,6 @@ class NotionManager:
         }
         if raw_content:
             props[self.prop.raw_content] = {"rich_text": [{"text": {"content": raw_content[:1900]}}]}
+        if canonical_url:
+            props[self.prop.canonical_url] = {"url": canonical_url}
         self.client.pages.update(page_id=page_id, properties=props)

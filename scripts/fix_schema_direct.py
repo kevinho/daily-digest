@@ -26,7 +26,7 @@ def get_env(name: str, required: bool = False) -> str | None:
     return val
 
 
-def build_updates() -> Dict[str, Dict]:
+def build_updates(data_source_id: str) -> Dict[str, Dict]:
     """Define the schema fields to ensure exist (idempotent)."""
     updates: Dict[str, Dict] = {
         # 注意：data_sources patch 不接受 status.options，保留空对象
@@ -46,7 +46,13 @@ def build_updates() -> Dict[str, Dict]:
         },
         "Tags": {"multi_select": {}},
         "Canonical URL": {"url": {}},
-        "Duplicate Of": {"relation": {"database_id": get_env("NOTION_DATABASE_ID") or "", "type": "single_property"}},
+        # data_sources patch 需要 data_source_id，而非 database_id
+        "Duplicate Of": {
+            "relation": {
+                "data_source_id": data_source_id,
+                "type": "single_property",
+            }
+        },
         "Rule Version": {"rich_text": {}},
         "Prompt Version": {"rich_text": {}},
     }
@@ -60,7 +66,7 @@ def main() -> None:
     database_id = get_env("NOTION_DATABASE_ID")  # optional, for logging
 
     client = Client(auth=token)
-    updates = build_updates()
+    updates = build_updates(data_source_id)
 
     print("⚙️ 配置：")
     print(f"  - data_source_id: {data_source_id}")

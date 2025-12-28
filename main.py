@@ -72,11 +72,15 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
 
     summary = generate_digest(text)
     threshold = float(get_env("CONFIDENCE_THRESHOLD", "0.5"))
+    summary_text = summary.get("tldr", "")
+    insights = summary.get("insights")
+    if insights:
+        summary_text = (summary_text + "\n" + insights).strip()
     if confidence < threshold:
-        notion.mark_as_done(page_id, summary.get("tldr", ""), status=notion.status.pending)
+        notion.mark_as_done(page_id, summary_text, status=notion.status.pending)
         return
 
-    notion.mark_as_done(page_id, summary.get("tldr", ""))
+    notion.mark_as_done(page_id, summary_text)
 
 
 def main(digest_window: Optional[str] = None) -> None:

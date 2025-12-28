@@ -40,8 +40,17 @@ def build_props_config() -> Dict[str, str]:
     }
 
 
+def query_database(client: Client, database_id: str, **body: Any) -> Dict[str, Any]:
+    """Compat helper for databases query (avoids missing .query attr across versions)."""
+    return client.request(
+        path=f"databases/{database_id}/query",
+        method="post",
+        body=body,
+    )
+
+
 def cmd_list(client: Client, database_id: str, props: Dict[str, str], limit: int) -> None:
-    resp = client.databases.query(database_id=database_id, page_size=limit)
+    resp = query_database(client, database_id, page_size=limit)
     results: List[Dict[str, Any]] = resp.get("results", [])
     print(f"Found {len(results)} items (showing up to {limit}):")
     for page in results:

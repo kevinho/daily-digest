@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Dict, List, Tuple, Optional
 
 try:
@@ -37,9 +38,20 @@ def generate_digest(text: str) -> Dict[str, str]:
             pass
 
     # Fallback
+    tldr = (text or "TL;DR placeholder")[:120]
+    # Try to create simple bullet insights from sentences
+    sentences = re.split(r"[。！？!?\.]\s*", text or "")
+    insights_list = []
+    for s in sentences:
+        s = s.strip()
+        if s:
+            insights_list.append(f"- {s[:80]}")
+        if len(insights_list) >= 3:
+            break
+    insights = "\n".join(insights_list) if insights_list else "- " + tldr
     return {
-        "tldr": (text or "TL;DR placeholder")[:200],
-        "insights": "- Key points will appear here.",
+        "tldr": tldr,
+        "insights": insights,
     }
 
 

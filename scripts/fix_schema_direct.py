@@ -1,137 +1,115 @@
 #!/usr/bin/env python3
 """
-Direct Schema Fixer (Configurable API Version)
-通过 .env 配置 API 版本，解决 Data Source 兼容性问题。
+Direct Schema Fixer (Data Source patch version)
+
+使用 data_sources/{id} 方式更新字段，绕过新版 API 对 databases.update 的限制。
+所需环境变量：
+- NOTION_TOKEN
+- NOTION_DATA_SOURCE_ID  (Manage data sources -> Copy data source ID)
+- NOTION_DATABASE_ID     (仅用于日志，patch 用 data_source_id)
 """
+from __future__ import annotations
+
 import os
 import sys
 import json
+from typing import Dict
+
 from dotenv import load_dotenv
 from notion_client import Client, APIResponseError
 
-# 1. 加载配置
-load_dotenv()
-NOTION_TOKEN = os.getenv("NOTION_TOKEN")
-TARGET_DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
-DATA_SOURCE_ID = os.getenv("NOTION_DATA_SOURCE_ID")  # 从「Manage data sources -> Copy data source ID」拿
 
-if not NOTION_TOKEN or not TARGET_DATABASE_ID:
-    print("❌ 错误: 请检查 .env 文件中的 TOKEN 和 DATABASE_ID")
-    sys.exit(1)
-if not DATA_SOURCE_ID:
-    print("❌ 错误: 缺少 NOTION_DATA_SOURCE_ID（在 Manage data sources -> Copy data source ID 获取）")
-    sys.exit(1)
-
-# ==============================================================================
-# 🔑 Client 初始化
-# ==============================================================================
-client = Client(
-    auth=NOTION_TOKEN,
-)
+def get_env(name: str, required: bool = False) -> str | None:
+    val = os.getenv(name)
+    if required and (val is None or val == ""):
+        raise RuntimeError(f"Missing env: {name}")
+    return val
 
 
-def update_schema(updates: dict):
-    body = {
-        "properties": updates,  # 就是你原来构造的 updates
-    }
-    client.request(
-        path=f"data_sources/{DATA_SOURCE_ID}",
-        method="patch",
-        body=body,
-    )
-
-def fix_database_schema():
-    print(f"⚙️  配置加载完毕:")
-    print(f"   - Database ID: {TARGET_DATABASE_ID}")
-    
-    print(f"\n🔄 正在连接数据库...")
-    
-    try:
-        # 1. 获取现状
-        db = client.databases.retrieve(database_id=TARGET_DATABASE_ID)
-        print(f"✅ 连接成功！原始返回: {json.dumps(db, indent=2, ensure_ascii=False)}")
-
-        # 优先检测 Data Source 模式
-        ds_id = None
-        ds_list = db.get("data_sources")
-        if isinstance(ds_list, list) and ds_list:
-            first = ds_list[0]
-            if isinstance(first, dict):
-                ds_id = first.get("id")
-        if not ds_id:
-            ds_info = db.get("data_source")
-            if isinstance(ds_info, dict):
-                ds_id = ds_info.get("id") or ds_info.get("data_source_id")
-            elif isinstance(ds_info, str):
-                ds_id = ds_info
-        if not ds_id and isinstance(db, dict):
-            ds_id = db.get("data_source_id")
-
-        if ds_id:
-            print(f"⚠️ 检测到 Data Source: {ds_id}，请使用 data_sources/{DATA_SOURCE_ID} patch 更新。")
-            return
-
-        # 检查是否成功获取到了 properties
-        if "properties" in db and db.get("properties"):
-            print(f"✅ 读取到现有字段: {list(db['properties'].keys())}")
-        else:
-            print("❌ 警告：未读取到 properties，可能是 Data Source 或权限不足。")
-            return
-
-        current_props = db['properties']
-        updates = {}
-
-        # 2. 准备更新 (字段定义)
-        # ---------------------------------------------------------
-        
-        # Status (Select)
-        if "Status" not in current_props:
-            print("➕ 准备创建: Status (Select)")
-            updates["Status"] = {
-                "select": {
-                    "options": [
-                        {"name": "To Read", "color": "blue"},
-                        {"name": "Pending", "color": "yellow"},
-                        {"name": "Done", "color": "green"},
-                        {"name": "Error", "color": "red"}
-                    ]
-                }
+def build_updates() -> Dict[str, Dict]:
+    """Define the schema fields to ensure exist (idempotent)."""
+    updates: Dict[str, Dict] = {
+        "Status": {
+            "status": {
+                "options": [
+                    {"name": "To Read"},
+                    {"name": "pending"},
+                    {"name": "ready"},
+                    {"name": "excluded"},
+                    {"name": "Error"},
+                    {"name": "unprocessed"},
+                ]
             }
+        },
+        "URL": {"url": {}},
+        "Files": {"files": {}},
+        "Summary": {"rich_text": {}},
+        "Confidence": {"number": {}},
+        "Sensitivity": {
+            "select": {
+                "options": [
+                    {"name": "public"},
+                    {"name": "internal"},
+                    {"name": "private"},
+                ]
+            }
+        },
+        "Tags": {"multi_select": {}},
+        "Canonical URL": {"url": {}},
+        "Duplicate Of": {"relation": {"database_id": get_env("NOTION_DATABASE_ID") or "", "type": "single_property"}},
+        "Rule Version": {"rich_text": {}},
+        "Prompt Version": {"rich_text": {}},
+    }
+    return updates
 
-        # Summary
-        if "Summary" not in current_props:
-            print("➕ 准备创建: Summary (Rich Text)")
-            updates["Summary"] = {"rich_text": {}}
 
-        # URL
-        if "URL" not in current_props:
-            print("➕ 准备创建: URL")
-            updates["URL"] = {"url": {}}
+def main() -> None:
+    load_dotenv()
+    token = get_env("NOTION_TOKEN", required=True)
+    data_source_id = get_env("NOTION_DATA_SOURCE_ID", required=True)
+    database_id = get_env("NOTION_DATABASE_ID")  # optional, for logging
 
-        # Tags
-        if "Tags" not in current_props:
-            print("➕ 准备创建: Tags")
-            updates["Tags"] = {"multi_select": {}}
-            
-        # Confidence
-        if "Confidence" not in current_props:
-            print("➕ 准备创建: Confidence")
-            updates["Confidence"] = {"number": {"format": "number"}}
+    client = Client(auth=token)
+    updates = build_updates()
 
-        # ---------------------------------------------------------
+    print("⚙️ 配置：")
+    print(f"  - data_source_id: {data_source_id}")
+    if database_id:
+        print(f"  - database_id: {database_id} (仅日志)")
 
-        # 3. 执行更新
-        if not updates:
-            print("\n✨ 数据库 Schema 已是最新，无需更新。")
+    try:
+        print("\n🔄 拉取现有 schema (databases.retrieve，仅用于查看，不更新)...")
+        try:
+            db = client.databases.retrieve(database_id=data_source_id)
+        except Exception:
+            # 旧 token 权限可能不支持按 data_source_id 直接 retrieve，退回使用 database_id（若可用）
+            if database_id:
+                db = client.databases.retrieve(database_id=database_id)
+            else:
+                db = {}
+
+        props = db.get("properties") if isinstance(db, dict) else None
+        if props:
+            print(f"✅ 当前字段: {list(props.keys())}")
         else:
-            print(f"\n🚀 正在提交更新 ({len(updates)} 个字段)...")
-            update_schema(updates)
-            print("✅ 更新成功！（data_sources patch）所有字段已就绪。")
+            print("ℹ️ 未能读取 properties（可能是 Data Source 只读返回或权限限制），继续以 patch 方式更新。")
 
+        print("\n🚀 通过 data_sources patch 更新 schema...")
+        result = client.request(
+            path=f"data_sources/{data_source_id}",
+            method="patch",
+            body={"properties": updates},
+        )
+        print("✅ 更新完成，返回：")
+        print(json.dumps(result, indent=2, ensure_ascii=False))
 
     except APIResponseError as e:
         print(f"\n❌ API 请求失败: {e.code}")
         print(f"   消息: {e.message}")
+    except Exception as e:
+        print(f"\n❌ 其他异常: {e}")
+        raise
+
 
 if __name__ == "__main__":
-    fix_database_schema()
+    main()

@@ -96,10 +96,10 @@ def main() -> None:
     }
 
     result = notion.databases.update(database_id=database_id, properties=properties)
-    updated_props = list(result.get("properties", {}).keys())
-    print("Schema alignment requested. Properties now present:")
-    for name in updated_props:
-        print(f"- {name}")
+    import json
+
+    print("Schema alignment response:")
+    print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":

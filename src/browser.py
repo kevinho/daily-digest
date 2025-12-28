@@ -1,7 +1,26 @@
 import asyncio
-from typing import Optional
+from typing import Callable, Optional, TypeVar
 
-from tenacity import retry, stop_after_attempt, wait_exponential
+try:
+    from tenacity import retry, stop_after_attempt, wait_exponential
+except ImportError:
+    # Fallback no-op decorators if tenacity is not installed (e.g., in lightweight test env)
+    T = TypeVar("T")
+
+    def _identity(x: T) -> T:
+        return x
+
+    def retry(*args, **kwargs):  # type: ignore
+        def wrapper(fn: Callable[..., T]) -> Callable[..., T]:
+            return fn
+
+        return wrapper
+
+    def stop_after_attempt(*args, **kwargs):  # type: ignore
+        return None
+
+    def wait_exponential(*args, **kwargs):  # type: ignore
+        return None
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5, min=1, max=4))

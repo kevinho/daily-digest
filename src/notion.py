@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from notion_client import Client
+from notion_client.errors import APIResponseError
 
 from src.utils import get_env
 
@@ -64,11 +65,19 @@ class NotionManager:
 
     def _query(self, body: Dict[str, Any]) -> Dict[str, Any]:
         """Compat query helper for databases without .query convenience."""
+        # Prefer data_source query if available; fallback to database query on invalid URL
         if self.data_source_id:
-            path = f"data_sources/{self.data_source_id}/query"
-        else:
-            path = f"databases/{self.database_id}/query"
-        return self.client.request(path=path, method="post", body=body)
+            ds_path = f"data_sources/{self.data_source_id}/query"
+            try:
+                return self.client.request(path=ds_path, method="post", body=body)
+            except APIResponseError as exc:
+                if exc.code == "invalid_request_url":
+                    # Fallback to database query
+                    pass
+                else:
+                    raise
+        db_path = f"databases/{self.database_id}/query"
+        return self.client.request(path=db_path, method="post", body=body)
 
     def _status_filter(self, name: str) -> Dict[str, Any]:
         """Use select filter to stay compatible with DBs whose Status is select."""

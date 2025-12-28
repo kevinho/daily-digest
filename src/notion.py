@@ -115,11 +115,24 @@ class NotionManager:
             return None
         return self._simplify_page(results[0])
 
-    def _update_status(self, page_id: str, status: str, extra_props: Optional[Dict[str, Any]] = None) -> None:
-        props: Dict[str, Any] = {self.prop.status: {"status": {"name": status}}}
-        if extra_props:
-            props.update(extra_props)
+    def _set_status(self, page_id: str, status: str, extra_props: Optional[Dict[str, Any]] = None) -> None:
+        """Update status property; try Status type first, then fall back to select for compatibility."""
+        base_props: Dict[str, Any] = extra_props.copy() if extra_props else {}
+        # First attempt: Status type
+        try:
+            props = base_props.copy()
+            props[self.prop.status] = {"status": {"name": status}}
+            self.client.pages.update(page_id=page_id, properties=props)
+            return
+        except Exception:
+            pass
+        # Fallback: Select type
+        props = base_props.copy()
+        props[self.prop.status] = {"select": {"name": status}}
         self.client.pages.update(page_id=page_id, properties=props)
+
+    def _update_status(self, page_id: str, status: str, extra_props: Optional[Dict[str, Any]] = None) -> None:
+        self._set_status(page_id, status, extra_props)
 
     def mark_as_done(self, page_id: str, summary: str, status: Optional[str] = None) -> None:
         props = {

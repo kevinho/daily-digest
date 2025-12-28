@@ -23,6 +23,7 @@ class PropertyNames:
     status: str = "Status"
     url: str = "URL"
     summary: str = "Summary"
+    raw_content: str = "Raw Content"
     confidence: str = "Confidence"
     sensitivity: str = "Sensitivity"
     files: str = "Files"
@@ -55,6 +56,7 @@ class NotionManager:
             status=get_env("NOTION_PROP_STATUS", PropertyNames.status),
             url=get_env("NOTION_PROP_URL", PropertyNames.url),
             summary=get_env("NOTION_PROP_SUMMARY", PropertyNames.summary),
+            raw_content=get_env("NOTION_PROP_RAW_CONTENT", PropertyNames.raw_content),
             confidence=get_env("NOTION_PROP_CONFIDENCE", PropertyNames.confidence),
             sensitivity=get_env("NOTION_PROP_SENSITIVITY", PropertyNames.sensitivity),
             files=get_env("NOTION_PROP_FILES", PropertyNames.files),
@@ -316,6 +318,7 @@ class NotionManager:
         confidence: float,
         rule_version: str,
         prompt_version: str,
+        raw_content: Optional[str] = None,
     ) -> None:
         props: Dict[str, Any] = {
             self.prop.tags: {"multi_select": [{"name": t} for t in tags]},
@@ -324,4 +327,6 @@ class NotionManager:
             self.prop.rule_version: {"rich_text": [{"text": {"content": rule_version}}]},
             self.prop.prompt_version: {"rich_text": [{"text": {"content": prompt_version}}]},
         }
+        if raw_content:
+            props[self.prop.raw_content] = {"rich_text": [{"text": {"content": raw_content[:1900]}}]}
         self.client.pages.update(page_id=page_id, properties=props)

@@ -67,6 +67,7 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
         confidence=confidence,
         rule_version=rule_version,
         prompt_version=prompt_version,
+        raw_content=text,
     )
 
     summary = generate_digest(text)

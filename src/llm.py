@@ -7,11 +7,6 @@ from dotenv import load_dotenv
 # Ensure .env is loaded even when llm is imported standalone
 load_dotenv()
 
-try:
-    from openai import OpenAI
-except ImportError:
-    OpenAI = None  # type: ignore
-
 
 def generate_digest(text: str) -> Dict[str, str]:
     """
@@ -19,13 +14,18 @@ def generate_digest(text: str) -> Dict[str, str]:
     """
     api_key = os.getenv("OPENAI_API_KEY")
 
+    try:
+        # Clean proxy envs before importing openai
+        for k in ["OPENAI_PROXY", "OPENAI_HTTP_PROXY", "OPENAI_HTTPS_PROXY", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
+            os.environ.pop(k, None)
+        from openai import OpenAI  # type: ignore
+    except ImportError:
+        OpenAI = None  # type: ignore
+
     print(f"OpenAI: {OpenAI}, api_key: {api_key}")
 
     if OpenAI and api_key:
         try:
-            # Clean proxy envs that may be injected into client kwargs
-            for k in ["OPENAI_PROXY", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
-                os.environ.pop(k, None)
             client = OpenAI(api_key=api_key)
             prompt = (
                 "请用中文总结下面内容，输出两部分：\n"

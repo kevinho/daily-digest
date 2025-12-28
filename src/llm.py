@@ -32,7 +32,14 @@ def generate_digest(text: str) -> Dict[str, str]:
 
         openai.proxy = None
         openai.proxies = None
-        from openai import OpenAI  # type: ignore
+        from openai import OpenAI as _OpenAI  # type: ignore
+
+        class OpenAI(_OpenAI):  # type: ignore
+            def __init__(self, *args, **kwargs):
+                kwargs.pop("proxies", None)
+                kwargs.pop("proxy", None)
+                super().__init__(*args, **kwargs)
+
     except ImportError:
         OpenAI = None  # type: ignore
 

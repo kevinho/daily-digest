@@ -8,8 +8,7 @@ from dotenv import load_dotenv
 from notion_client import Client
 
 load_dotenv()
-notion_version = os.getenv("NOTION_VERSION", "2022-06-28")
-client = Client(auth=os.getenv("NOTION_TOKEN"), notion_version=notion_version)
+client = Client(auth=os.getenv("NOTION_TOKEN"))
 db_id = os.getenv("NOTION_DATABASE_ID")
 
 def test_insert():

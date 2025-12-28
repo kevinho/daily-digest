@@ -35,8 +35,7 @@ class NotionManager:
     def __init__(self) -> None:
         token = get_env("NOTION_TOKEN", required=True)
         self.database_id = get_env("NOTION_DATABASE_ID", required=True)
-        notion_version = get_env("NOTION_VERSION", "2022-06-28")
-        self.client = Client(auth=token, notion_version=notion_version)
+        self.client = Client(auth=token)
 
         self.status = StatusNames(
             pending=get_env("NOTION_STATUS_PENDING", StatusNames.pending),

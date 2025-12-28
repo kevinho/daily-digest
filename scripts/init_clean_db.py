@@ -11,7 +11,6 @@ from notion_client import Client
 # 1. 加载 Token
 load_dotenv()
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
-NOTION_VERSION = os.getenv("NOTION_VERSION", "2022-06-28")
 
 # ⚠️⚠️⚠️ 请在这里填入你的【父页面 ID】(Parent Page ID) ⚠️⚠️⚠️
 # 也就是你想把数据库放在哪个页面里？
@@ -21,7 +20,7 @@ if "请" in PARENT_PAGE_ID:
     print("❌ 错误: 请先修改脚本中的 PARENT_PAGE_ID！")
     sys.exit(1)
 
-client = Client(auth=NOTION_TOKEN, notion_version=NOTION_VERSION)
+client = Client(auth=NOTION_TOKEN)
 
 def create_clean_db():
     print(f"🏗 正在页面 {PARENT_PAGE_ID} 中创建原生数据库...")

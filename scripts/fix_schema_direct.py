@@ -15,9 +15,6 @@ NOTION_TOKEN = os.getenv("NOTION_TOKEN")
 TARGET_DATABASE_ID = os.getenv("NOTION_DATABASE_ID")
 DATA_SOURCE_ID = os.getenv("NOTION_DATA_SOURCE_ID")  # 从「Manage data sources -> Copy data source ID」拿
 
-# 获取版本号，默认兜底为 2022-06-28 (经典版)
-NOTION_VERSION = os.getenv("NOTION_VERSION", "2022-06-28")
-
 if not NOTION_TOKEN or not TARGET_DATABASE_ID:
     print("❌ 错误: 请检查 .env 文件中的 TOKEN 和 DATABASE_ID")
     sys.exit(1)
@@ -27,11 +24,9 @@ if not DATA_SOURCE_ID:
 
 # ==============================================================================
 # 🔑 Client 初始化
-# 从环境变量读取版本号，实现解耦
 # ==============================================================================
 client = Client(
     auth=NOTION_TOKEN,
-    notion_version=NOTION_VERSION
 )
 
 
@@ -48,7 +43,6 @@ def update_schema(updates: dict):
 def fix_database_schema():
     print(f"⚙️  配置加载完毕:")
     print(f"   - Database ID: {TARGET_DATABASE_ID}")
-    print(f"   - API Version: {NOTION_VERSION} (关键参数)")
     
     print(f"\n🔄 正在连接数据库...")
     
@@ -61,8 +55,7 @@ def fix_database_schema():
             print(f"✅ 连接成功！读取到现有字段: {list(db['properties'].keys())}")
         else:
             print("❌ 警告：未读取到 Properties。")
-            print(f"   可能原因：当前 API 版本 ({NOTION_VERSION}) 强制返回 Data Source 格式。")
-            print("   建议：请确保 .env 中 NOTION_VERSION=2022-06-28")
+            print("   可能原因：当前 API 返回 Data Source 格式或权限不足。")
             return
 
         current_props = db['properties']

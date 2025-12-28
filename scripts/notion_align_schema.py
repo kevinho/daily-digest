@@ -23,7 +23,6 @@ def main() -> None:
     load_dotenv()
     token = get_env("NOTION_TOKEN")
     database_id = get_env("NOTION_DATABASE_ID")
-    notion_version = os.getenv("NOTION_VERSION", "2022-06-28")
     data_source_id = os.getenv("NOTION_DATA_SOURCE_ID")
 
     # 1. 定义字段映射 (Property Names)
@@ -54,8 +53,8 @@ def main() -> None:
     if not data_source_id:
         raise RuntimeError("Missing NOTION_DATA_SOURCE_ID (Manage data sources -> Copy data source ID)")
 
-    client = Client(auth=token, notion_version=notion_version)
-    print(f"🔄 正在连接数据库: {database_id} ... (version={notion_version})")
+    client = Client(auth=token)
+    print(f"🔄 正在连接数据库: {database_id} ...")
 
     try:
         # 3. 获取当前数据库 Schema，做差异对比

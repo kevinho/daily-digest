@@ -52,6 +52,16 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
         notion.mark_as_error(page_id, "no content")
         return
 
+    blocked_markers = [
+        "JavaScript is disabled",
+        "enable JavaScript",
+        "继续使用 x.com",
+        "continue using x.com",
+    ]
+    if any(marker.lower() in text.lower() for marker in blocked_markers):
+        notion.mark_as_error(page_id, "fetch blocked: JS/anti-bot page returned; retry in logged-in browser")
+        return
+
     # Classification
     classification = classify(text)
     tags = classification.get("tags", [])

@@ -46,11 +46,11 @@ def build_updates(data_source_id: str) -> Dict[str, Dict]:
         },
         "Tags": {"multi_select": {}},
         "Canonical URL": {"url": {}},
-        # data_sources patch 需要 data_source_id，而非 database_id
         "Duplicate Of": {
             "relation": {
                 "data_source_id": data_source_id,
-                "type": "single_property",
+                # data_sources patch 需要指定 single_property / dual_property 之一
+                "single_property": {},
             }
         },
         "Rule Version": {"rich_text": {}},

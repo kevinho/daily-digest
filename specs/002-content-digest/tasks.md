@@ -28,8 +28,8 @@
 - [X] T014 [US1] Integrate dedupe logic in main.py: canonical URL/hash check via NotionManager before processing; link duplicates.
 - [X] T015 [US1] Implement text normalization in src/browser.py for HTML/text; detect PDF/image and mark as unprocessed (no OCR), persisting attachment link.
 - [X] T016 [US1] Update main.py to set status pending/ready/excluded based on confidence/sensitivity rules.
-- [ ] T017 [US1] Add pytest cases for dedupe rules and confidence gating (unit, no external calls). [P] [US1] tests/test_dedupe.py, tests/test_confidence.py. [Gap]
-- [ ] T018 [US1] Add integration test with mocked Notion and browser to ensure a URL becomes a normalized Notion entry with tags/sensitivity/confidence. [US1] tests/integration/test_ingest.py. [Gap]
+- [X] T017 [US1] Add pytest cases for dedupe rules and confidence gating (unit, no external calls). [P] [US1] tests/test_dedupe_confidence.py.
+- [X] T018 [US1] Add integration test with mocked Notion and browser to ensure a URL becomes a normalized Notion entry with tags/sensitivity/confidence. [US1] tests/test_ingest_integration.py.
 
 ## Phase 4: User Story 2 - Scheduled Personal Digests in Notion (Priority: P2)
 **Goal**: Generate digests (daily/weekly/monthly/ad-hoc) with topic grouping, citations to Notion entries, redaction for sensitive items; manual trigger on personal macOS (CLI) before any automation.

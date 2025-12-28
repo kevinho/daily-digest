@@ -23,6 +23,11 @@ class PropertyNames:
     summary: str = "Summary"
     confidence: str = "Confidence"
     sensitivity: str = "Sensitivity"
+    canonical_url: str = "Canonical URL"
+    duplicate_of: str = "Duplicate Of"
+    tags: str = "Tags"
+    rule_version: str = "Rule Version"
+    prompt_version: str = "Prompt Version"
 
 
 class NotionManager:
@@ -46,6 +51,11 @@ class NotionManager:
             summary=get_env("NOTION_PROP_SUMMARY", PropertyNames.summary),
             confidence=get_env("NOTION_PROP_CONFIDENCE", PropertyNames.confidence),
             sensitivity=get_env("NOTION_PROP_SENSITIVITY", PropertyNames.sensitivity),
+            canonical_url=get_env("NOTION_PROP_CANONICAL_URL", PropertyNames.canonical_url),
+            duplicate_of=get_env("NOTION_PROP_DUPLICATE_OF", PropertyNames.duplicate_of),
+            tags=get_env("NOTION_PROP_TAGS", PropertyNames.tags),
+            rule_version=get_env("NOTION_PROP_RULE_VERSION", PropertyNames.rule_version),
+            prompt_version=get_env("NOTION_PROP_PROMPT_VERSION", PropertyNames.prompt_version),
         )
 
     def _simplify_page(self, page: Dict[str, Any]) -> Dict[str, Any]:
@@ -78,17 +88,33 @@ class NotionManager:
         )
         return [self._simplify_page(p) for p in resp.get("results", [])]
 
+    def find_by_canonical(self, canonical_url: str) -> Optional[Dict[str, Any]]:
+        resp = self.client.databases.query(
+            **{
+                "database_id": self.database_id,
+                "filter": {
+                    "property": self.prop.canonical_url,
+                    "url": {"equals": canonical_url},
+                },
+            }
+        )
+        results = resp.get("results", [])
+        if not results:
+            return None
+        return self._simplify_page(results[0])
+
     def _update_status(self, page_id: str, status: str, extra_props: Optional[Dict[str, Any]] = None) -> None:
         props: Dict[str, Any] = {self.prop.status: {"status": {"name": status}}}
         if extra_props:
             props.update(extra_props)
         self.client.pages.update(page_id=page_id, properties=props)
 
-    def mark_as_done(self, page_id: str, summary: str) -> None:
+    def mark_as_done(self, page_id: str, summary: str, status: Optional[str] = None) -> None:
         props = {
             self.prop.summary: {"rich_text": [{"text": {"content": summary[:1900]}}]},
         }
-        self._update_status(page_id, self.status.ready, props)
+        target_status = status or self.status.ready
+        self._update_status(page_id, target_status, props)
 
     def mark_as_error(self, page_id: str, error: str) -> None:
         props = {
@@ -127,3 +153,28 @@ class NotionManager:
             }
         )
         return [self._simplify_page(p) for p in resp.get("results", [])]
+
+    def set_duplicate_of(self, page_id: str, canonical_id: str, note: str) -> None:
+        props = {
+            self.prop.duplicate_of: {"relation": [{"id": canonical_id}]},
+            self.prop.summary: {"rich_text": [{"text": {"content": note[:1900]}}]},
+        }
+        self._update_status(page_id, self.status.excluded, props)
+
+    def set_classification(
+        self,
+        page_id: str,
+        tags: List[str],
+        sensitivity: str,
+        confidence: float,
+        rule_version: str,
+        prompt_version: str,
+    ) -> None:
+        props: Dict[str, Any] = {
+            self.prop.tags: {"multi_select": [{"name": t} for t in tags]},
+            self.prop.sensitivity: {"select": {"name": sensitivity}},
+            self.prop.confidence: {"number": confidence},
+            self.prop.rule_version: {"rich_text": [{"text": {"content": rule_version}}]},
+            self.prop.prompt_version: {"rich_text": [{"text": {"content": prompt_version}}]},
+        }
+        self.client.pages.update(page_id=page_id, properties=props)

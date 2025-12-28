@@ -23,11 +23,11 @@
 **Goal**: Items from share/clipper/URL land in Notion with metadata, normalized text (when available), tags/sensitivity, dedupe, confidence; attachments without text are marked unprocessed and excluded from digests; low-confidence held from digests.
 **Independent Test**: Submit URL/text/file/image; verify Notion row has source/device/timestamp/type, normalized text when available, tags/sensitivity/confidence, dedupe linking, unprocessed marker for non-text attachments; low-confidence marked pending/excluded from digests.
 
-- [ ] T012 [US1] Finalize Notion schema mapping in src/notion.py (properties for source, device, timestamp, type, tags, sensitivity, confidence, status, canonical_url, duplicate_of, rule_version, prompt_version). [Gap]
-- [ ] T013 [US1] Implement classification hook in src/llm.py (or rule+LLM hybrid placeholder) returning tags, sensitivity, confidence, prompt_version; integrate rule_version placeholders. [Gap]
-- [ ] T014 [US1] Integrate dedupe logic in main.py: canonical URL/hash check via NotionManager before processing; link duplicates. [Gap]
-- [ ] T015 [US1] Implement text normalization in src/browser.py for HTML/text; detect PDF/image and mark as unprocessed (no OCR), persisting attachment link. [Gap]
-- [ ] T016 [US1] Update main.py to set status pending/ready/excluded based on confidence/sensitivity rules. [Gap]
+- [X] T012 [US1] Finalize Notion schema mapping in src/notion.py (properties for source, device, timestamp, type, tags, sensitivity, confidence, status, canonical_url, duplicate_of, rule_version, prompt_version).
+- [X] T013 [US1] Implement classification hook in src/llm.py (or rule+LLM hybrid placeholder) returning tags, sensitivity, confidence, prompt_version; integrate rule_version placeholders.
+- [X] T014 [US1] Integrate dedupe logic in main.py: canonical URL/hash check via NotionManager before processing; link duplicates.
+- [X] T015 [US1] Implement text normalization in src/browser.py for HTML/text; detect PDF/image and mark as unprocessed (no OCR), persisting attachment link.
+- [X] T016 [US1] Update main.py to set status pending/ready/excluded based on confidence/sensitivity rules.
 - [ ] T017 [US1] Add pytest cases for dedupe rules and confidence gating (unit, no external calls). [P] [US1] tests/test_dedupe.py, tests/test_confidence.py. [Gap]
 - [ ] T018 [US1] Add integration test with mocked Notion and browser to ensure a URL becomes a normalized Notion entry with tags/sensitivity/confidence. [US1] tests/integration/test_ingest.py. [Gap]
 

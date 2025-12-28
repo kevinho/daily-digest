@@ -9,11 +9,12 @@ def generate_digest(text: str) -> Dict[str, str]:
     }
 
 
-def classify(text: str) -> Dict[str, str]:
+def classify(text: str) -> Dict[str, any]:
     # Placeholder classification; to be replaced by rule+LLM hybrid
     return {
-        "tags": "general",
+        "tags": ["general"],
         "sensitivity": "public",
-        "confidence": "0.8",
-        "prompt_version": "v0-placeholder",
+        "confidence": 0.8,
+        "rule_version": "rule-v0",
+        "prompt_version": "prompt-v0",
     }

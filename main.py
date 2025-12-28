@@ -21,6 +21,17 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
     if not url:
         notion.mark_as_error(page_id, "missing url")
         return
+
+    # Dedupe by canonical URL
+    from src.dedupe import canonical_url
+
+    canonical = canonical_url(url)
+    existing = notion.find_by_canonical(canonical)
+    if existing and existing.get("id") != page_id:
+        notion.set_duplicate_of(page_id, existing["id"], f"Duplicate of {existing['id']}")
+        return
+
+    # Attachment without OCR support
     if is_attachment_unprocessed(url):
         notion.mark_unprocessed(page_id, "Attachment stored; OCR out of scope; excluded from digests")
         return
@@ -30,11 +41,30 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
         notion.mark_as_error(page_id, "no content")
         return
 
-    summary = generate_digest(text)
-    notion.mark_as_done(page_id, summary.get("tldr", ""))
+    # Classification
+    classification = classify(text)
+    tags = classification.get("tags", [])
+    sensitivity = classification.get("sensitivity", "public")
+    confidence = float(classification.get("confidence", 0.0))
+    rule_version = classification.get("rule_version", "rule-v0")
+    prompt_version = classification.get("prompt_version", "prompt-v0")
 
-    # Classification placeholder; extend to write tags/sensitivity/confidence later
-    _ = classify(text)
+    notion.set_classification(
+        page_id=page_id,
+        tags=tags,
+        sensitivity=sensitivity,
+        confidence=confidence,
+        rule_version=rule_version,
+        prompt_version=prompt_version,
+    )
+
+    summary = generate_digest(text)
+    threshold = float(get_env("CONFIDENCE_THRESHOLD", "0.5"))
+    if confidence < threshold:
+        notion.mark_as_done(page_id, summary.get("tldr", ""), status=notion.status.pending)
+        return
+
+    notion.mark_as_done(page_id, summary.get("tldr", ""))
 
 
 def main(digest_window: Optional[str] = None) -> None:

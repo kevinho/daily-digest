@@ -49,13 +49,27 @@ def fix_database_schema():
     try:
         # 1. 获取现状
         db = client.databases.retrieve(database_id=TARGET_DATABASE_ID)
-        
-        # 检查是否成功获取到了 properties (只有旧版API或者非Data Source才会有)
-        if "properties" in db:
-            print(f"✅ 连接成功！读取到现有字段: {list(db['properties'].keys())}")
+        print(f"✅ 连接成功！原始返回: {json.dumps(db, indent=2, ensure_ascii=False)}")
+
+        # 优先检测 Data Source 模式
+        ds_info = db.get("data_source")
+        ds_id = None
+        if isinstance(ds_info, dict):
+            ds_id = ds_info.get("id") or ds_info.get("data_source_id")
+        elif isinstance(ds_info, str):
+            ds_id = ds_info
+        if not ds_id and isinstance(db, dict):
+            ds_id = db.get("data_source_id")
+
+        if ds_id:
+            print(f"⚠️ 检测到 Data Source: {ds_id}，请使用 data_sources/{DATA_SOURCE_ID} patch 更新。")
+            return
+
+        # 检查是否成功获取到了 properties
+        if "properties" in db and db.get("properties"):
+            print(f"✅ 读取到现有字段: {list(db['properties'].keys())}")
         else:
-            print("❌ 警告：未读取到 Properties。")
-            print("   可能原因：当前 API 返回 Data Source 格式或权限不足。")
+            print("❌ 警告：未读取到 properties，可能是 Data Source 或权限不足。")
             return
 
         current_props = db['properties']

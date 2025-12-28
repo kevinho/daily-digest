@@ -146,7 +146,13 @@ class NotionManager:
     def _update_status(self, page_id: str, status: str, extra_props: Optional[Dict[str, Any]] = None) -> None:
         self._set_status(page_id, status, extra_props)
 
-    def create_digest_page(self, title: str, sections: List[Dict[str, Any]], citations: List[str]) -> Optional[str]:
+    def create_digest_page(
+        self,
+        title: str,
+        sections: List[Dict[str, Any]],
+        citations: List[str],
+        metadata: Optional[Dict[str, str]] = None,
+    ) -> Optional[str]:
         """
         Write a digest page under a parent page.
         Requires NOTION_DIGEST_PARENT_ID to be set.
@@ -155,6 +161,17 @@ class NotionManager:
             return None
 
         children_blocks: List[Dict[str, Any]] = []
+
+        # Optional metadata paragraph
+        if metadata:
+            meta_text = " | ".join(f"{k}: {v}" for k, v in metadata.items())
+            children_blocks.append(
+                {
+                    "object": "block",
+                    "type": "paragraph",
+                    "paragraph": {"rich_text": [{"type": "text", "text": {"content": meta_text}}]},
+                }
+            )
         for sec in sections:
             heading = {
                 "object": "block",

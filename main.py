@@ -2,13 +2,14 @@
 import argparse
 import asyncio
 import logging
+from datetime import datetime
 from typing import Optional
 
 from src.browser import fetch_page_content
 from src.llm import classify, generate_digest
 from src.notion import NotionManager
 from src.digest import build_digest
-from src.utils import configure_logging, get_env
+from src.utils import configure_logging, get_env, get_timezone
 
 
 def is_attachment_unprocessed(url: str) -> bool:
@@ -85,8 +86,10 @@ def main(digest_window: Optional[str] = None) -> None:
         ready = notion.fetch_ready_for_digest(since=None, until=None, include_private=False)
         digest_payload = build_digest(ready)
         logging.info("Digest built with %d sections, %d citations", len(digest_payload["sections"]), len(digest_payload["citations"]))
-        digest_title = f"Digest ({digest_window})"
-        page_id = notion.create_digest_page(digest_title, digest_payload["sections"], digest_payload["citations"])
+        now = datetime.now(get_timezone())
+        digest_title = f"Digest ({digest_window}) {now.strftime('%Y-%m-%d %H:%M')}"
+        metadata = {"window": digest_window, "generated_at": now.isoformat()}
+        page_id = notion.create_digest_page(digest_title, digest_payload["sections"], digest_payload["citations"], metadata=metadata)
         if page_id:
             logging.info("Digest page created: %s", page_id)
         else:

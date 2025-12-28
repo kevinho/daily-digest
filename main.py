@@ -7,6 +7,7 @@ from typing import Optional
 from src.browser import fetch_page_content
 from src.llm import classify, generate_digest
 from src.notion import NotionManager
+from src.digest import build_digest
 from src.utils import configure_logging, get_env
 
 
@@ -80,7 +81,10 @@ def main(digest_window: Optional[str] = None) -> None:
     for item in pending:
         process_item(item, notion, cdp_url)
     if digest_window:
-        logging.info("Manual digest trigger requested for window=%s (not implemented)", digest_window)
+        logging.info("Manual digest trigger requested for window=%s", digest_window)
+        ready = notion.fetch_ready_for_digest(since=None, until=None, include_private=False)
+        digest_payload = build_digest(ready)
+        logging.info("Digest built with %d sections, %d citations", len(digest_payload["sections"]), len(digest_payload["citations"]))
 
 
 if __name__ == "__main__":

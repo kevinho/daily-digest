@@ -35,11 +35,11 @@
 **Goal**: Generate digests (daily/weekly/monthly/ad-hoc) with topic grouping, citations to Notion entries, redaction for sensitive items; manual trigger on personal macOS (CLI) before any automation.
 **Independent Test**: With ready items in Notion, run manual CLI digest; verify Notion digest page created with sections, citations to entries, excludes low-confidence/sensitive items per rules.
 
-- [ ] T019 [US2] Implement digest query/filter in src/notion.py for time window, status=ready, sensitivity rules. [Gap]
-- [ ] T020 [US2] Implement summarization prompt in src/llm.py: TL;DR + key insights with citations placeholders. [Gap]
-- [ ] T021 [US2] Implement digest builder in src/digest.py (create new file) to assemble sections, apply redaction, and write Notion page with backlinks. [Gap]
-- [ ] T022 [US2] Implement manual CLI trigger in main.py for daily/weekly/monthly/ad-hoc digests on macOS host (no scheduler yet). [Gap]
-- [ ] T023 [US2] Add unit test for digest grouping/redaction logic with fixtures. [P] [US2] tests/test_digest.py. [Gap]
+- [X] T019 [US2] Implement digest query/filter in src/notion.py for time window, status=ready, sensitivity rules.
+- [X] T020 [US2] Implement summarization prompt in src/llm.py: TL;DR + key insights with citations placeholders.
+- [X] T021 [US2] Implement digest builder in src/digest.py (create new file) to assemble sections, apply redaction, and write Notion page with backlinks.
+- [X] T022 [US2] Implement manual CLI trigger in main.py for daily/weekly/monthly/ad-hoc digests on macOS host (no scheduler yet).
+- [X] T023 [US2] Add unit test for digest grouping/redaction logic with fixtures. [P] [US2] tests/test_digest.py.
 
 ## Phase 5: User Story 3 - Search, Review & Corrections in Notion (Priority: P3)
 **Goal**: Search/filter in Notion views; corrections to tags/summaries affect future outputs and exclusions.

@@ -52,12 +52,18 @@ def fix_database_schema():
         print(f"✅ 连接成功！原始返回: {json.dumps(db, indent=2, ensure_ascii=False)}")
 
         # 优先检测 Data Source 模式
-        ds_info = db.get("data_source")
         ds_id = None
-        if isinstance(ds_info, dict):
-            ds_id = ds_info.get("id") or ds_info.get("data_source_id")
-        elif isinstance(ds_info, str):
-            ds_id = ds_info
+        ds_list = db.get("data_sources")
+        if isinstance(ds_list, list) and ds_list:
+            first = ds_list[0]
+            if isinstance(first, dict):
+                ds_id = first.get("id")
+        if not ds_id:
+            ds_info = db.get("data_source")
+            if isinstance(ds_info, dict):
+                ds_id = ds_info.get("id") or ds_info.get("data_source_id")
+            elif isinstance(ds_info, str):
+                ds_id = ds_info
         if not ds_id and isinstance(db, dict):
             ds_id = db.get("data_source_id")
 

@@ -13,11 +13,11 @@
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 - [X] T006 Implement start_chrome.sh to launch Chrome with --remote-debugging-port=9222 and user-data-dir, fail clearly if Chrome missing.
-- [ ] T007 Implement src/notion.py NotionManager skeleton: init client, read pending items (Status="To Read"/pending), update status/summary, mark error. [Gap]
-- [ ] T008 Implement src/dedupe.py helpers: canonical_url normalize, content hash, duplicate_of resolution rules. [Gap]
-- [ ] T009 Implement src/browser.py CDP connector using playwright.connect_over_cdp, page fetch, HTML extraction, trafilatura.extract to text; include timeout/retry/backoff hooks. [Gap]
-- [ ] T010 Wire main.py orchestrator skeleton: loop pending items → fetch → summarize placeholder → write back; include graceful shutdown and backoff on rate limits. [Gap]
-- [ ] T011 Add pytest scaffolding and fixtures directory; smoke test placeholders for notion/browser modules. [Gap]
+- [X] T007 Implement src/notion.py NotionManager skeleton: init client, read pending items (Status="To Read"/pending), update status/summary, mark error.
+- [X] T008 Implement src/dedupe.py helpers: canonical_url normalize, content hash, duplicate_of resolution rules.
+- [X] T009 Implement src/browser.py CDP connector using playwright.connect_over_cdp, page fetch, HTML extraction, trafilatura.extract to text; include timeout/retry/backoff hooks.
+- [X] T010 Wire main.py orchestrator skeleton: loop pending items → fetch → summarize placeholder → write back; include graceful shutdown and backoff on rate limits.
+- [X] T011 Add pytest scaffolding and fixtures directory; smoke test placeholders for notion/browser modules.
 
 ## Phase 3: User Story 1 - Capture & Classify via Notion Inbox (Priority: P1)
 **Goal**: Items from share/clipper/URL land in Notion with metadata, normalized text (when available), tags/sensitivity, dedupe, confidence; attachments without text are marked unprocessed and excluded from digests; low-confidence held from digests.

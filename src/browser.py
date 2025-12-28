@@ -1,13 +1,22 @@
 import asyncio
 from typing import Optional
 
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
-import trafilatura
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5, min=1, max=4))
 async def fetch_page_content(url: str, cdp_url: str = "http://localhost:9222", timeout_ms: int = 15000) -> Optional[str]:
+    # Lazy import to avoid hard dependency at module import time (helps tests without playwright installed)
+    try:
+        from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+    except ImportError as exc:
+        raise RuntimeError("playwright is required to fetch page content") from exc
+
+    try:
+        import trafilatura
+    except ImportError as exc:
+        raise RuntimeError("trafilatura is required to extract text") from exc
+
     async with async_playwright() as p:
         browser = await p.chromium.connect_over_cdp(cdp_url)
         page = await browser.new_page()

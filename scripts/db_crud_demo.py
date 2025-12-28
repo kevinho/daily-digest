@@ -92,8 +92,21 @@ def cmd_create(client: Client, database_id: str, props: Dict[str, str], title: s
 
 
 def cmd_update_status(client: Client, props: Dict[str, str], page_id: str, status: str) -> None:
-    client.pages.update(page_id=page_id, properties={props["status"]: {"status": {"name": status}}})
-    print(f"✅ Updated status for {page_id} -> {status}")
+    prop_name = props["status"]
+    # Try Status type first; if validation fails (e.g., property is select), fall back to select
+    try:
+        client.pages.update(page_id=page_id, properties={prop_name: {"status": {"name": status}}})
+        print(f"✅ Updated status for {page_id} -> {status} (status type)")
+        return
+    except Exception as e:
+        # fallback to select
+        try:
+            client.pages.update(page_id=page_id, properties={prop_name: {"select": {"name": status}}})
+            print(f"✅ Updated status for {page_id} -> {status} (select type)")
+            return
+        except Exception as e2:
+            print(f"❌ Failed to update status for {page_id}. Tried status and select. Last error: {e2}")
+            raise
 
 
 def cmd_archive(client: Client, page_id: str) -> None:

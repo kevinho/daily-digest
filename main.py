@@ -42,7 +42,12 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
         notion.mark_unprocessed(page_id, "Attachment stored; OCR out of scope; excluded from digests")
         return
 
-    text = asyncio.get_event_loop().run_until_complete(fetch_page_content(url, cdp_url))
+    try:
+        text = asyncio.run(fetch_page_content(url, cdp_url))
+    except RuntimeError as exc:
+        notion.mark_as_error(page_id, f"fetch failed: {exc}")
+        return
+
     if not text:
         notion.mark_as_error(page_id, "no content")
         return

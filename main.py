@@ -9,7 +9,7 @@ from src.browser import fetch_page_content
 from src.llm import classify, generate_digest
 from src.notion import NotionManager
 from src.digest import build_digest
-from src.utils import configure_logging, get_env, get_timezone
+from src.utils import configure_logging, get_env, get_timezone, normalize_tweet_url
 
 
 def is_attachment_unprocessed(url: str) -> bool:
@@ -28,10 +28,14 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
             notion.mark_as_error(page_id, "missing url")
         return
 
-    # Dedupe by canonical URL
     from src.dedupe import canonical_url
 
-    canonical = canonical_url(url)
+    tweet_norm = normalize_tweet_url(url)
+    if tweet_norm is None and ("twitter.com" in url.lower() or "x.com" in url.lower()):
+        notion.mark_as_error(page_id, "invalid tweet url")
+        return
+    target_url = tweet_norm or url
+    canonical = canonical_url(target_url)
     existing = notion.find_by_canonical(canonical)
     if existing and existing.get("id") != page_id:
         notion.set_duplicate_of(page_id, existing["id"], f"Duplicate of {existing['id']}")
@@ -43,7 +47,7 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
         return
 
     try:
-        text = asyncio.run(fetch_page_content(url, cdp_url))
+        text = asyncio.run(fetch_page_content(target_url, cdp_url))
     except RuntimeError as exc:
         notion.mark_as_error(page_id, f"fetch failed: {exc}")
         return

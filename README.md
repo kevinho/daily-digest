@@ -1,14 +1,14 @@
 # Daily Digest
 
-> 个人内容收集、分类、摘要系统 —— 从 Notion 数据库自动抓取网页内容，AI 生成摘要，输出结构化 Digest。
+> 个人内容收集、分类、摘要系统 —— 从 Notion 数据库自动抓取网页内容，AI 生成摘要，输出递归汇总报告。
 
 ## ✨ 功能特性
 
 - **内容收集**: 通过 Notion 数据库收集待处理的 URL 和笔记
 - **自动分类**: 基于规则和 AI 进行内容分类和标签标注
 - **AI 摘要**: 使用 OpenAI GPT 模型生成 TLDR 和要点提炼
-- **Digest 生成**: 自动生成结构化摘要页面，包含综合概述和分类条目
-- **Twitter 支持**: 特殊处理 Twitter/X 链接，支持截图保存
+- **递归汇总**: 支持日报→周报→月报的层级汇总系统
+- **Twitter 支持**: 特殊处理 Twitter/X 链接，绕过反爬机制
 - **去重机制**: 基于规范化 URL 自动检测和标记重复内容
 
 ## 📋 环境要求
@@ -55,8 +55,11 @@ cp .env.example .env
 ### 5. 运行
 
 ```bash
-# 运行完整流程（预处理 + 内容抓取 + 生成 Digest）
-python main.py --digest daily
+# 处理新收集的 items（预处理 + 内容抓取 + AI 摘要）
+python main.py process
+
+# 生成日报
+python main.py report --type daily
 ```
 
 ## ⚙️ 环境变量
@@ -65,12 +68,17 @@ python main.py --digest daily
 
 ```bash
 # ===================
-# Notion 配置
+# Notion 配置 - Inbox 数据库
 # ===================
 NOTION_TOKEN=secret_xxx                 # Notion Integration Token
-NOTION_DATABASE_ID=xxx                  # 收集数据库 ID
+NOTION_DATABASE_ID=xxx                  # Inbox 数据库 ID
 NOTION_DATA_SOURCE_ID=xxx               # 可选，Data Source ID（同步数据库）
-NOTION_DIGEST_PARENT_ID=xxx             # Digest 输出的父页面 ID
+
+# ===================
+# Notion 配置 - Reporting 数据库
+# ===================
+NOTION_REPORTING_DB_ID=xxx              # Report 数据库 ID
+NOTION_REPORTING_DS_ID=xxx              # 可选，Report Data Source ID
 
 # ===================
 # Chrome 远程调试
@@ -88,8 +96,6 @@ OPENAI_MODEL=gpt-4o-mini                # 使用的模型
 # ===================
 TZ=Asia/Shanghai                        # 时区
 CONFIDENCE_THRESHOLD=0.5                # 分类置信度阈值
-TWITTER_SCREENSHOT_ENABLE=false         # 是否启用 Twitter 截图
-PREPROCESS_SCOPE=pending                # 预处理范围
 ```
 
 ### 获取 Notion 配置
@@ -114,35 +120,45 @@ PREPROCESS_SCOPE=pending                # 预处理范围
 
 ## 📖 使用方式
 
-### 仅运行预处理
+### 处理新 Items
 
-校验字段、补齐标题、分类路由：
+处理 Inbox 中新收集的条目（预处理 + 抓取 + AI 摘要）：
 
 ```bash
-python main.py --preprocess
+python main.py process
 ```
 
-### 生成 Digest
+### 生成报告
 
-处理待处理条目并生成 Digest 页面：
+生成递归汇总报告：
 
 ```bash
-# 日报
-python main.py --digest daily
+# 日报（汇总当天 ready 的 items）
+python main.py report --type daily
 
-# 周报
-python main.py --digest weekly
+# 周报（汇总本周的日报）
+python main.py report --type weekly
 
-# 自定义标签
-python main.py --digest custom
+# 月报（汇总本月的周报）
+python main.py report --type monthly
+
+# 指定日期
+python main.py report --type daily --date 2025-01-15
+
+# 强制重新生成
+python main.py report --type daily --force
 ```
 
-### 完整流程
+### 递归汇总架构
 
-预处理 + 内容抓取 + AI 摘要 + Digest 生成：
-
-```bash
-python main.py --digest daily
+```
+Level 4: Monthly ───┐
+   ↑                │ 汇总 Weekly
+Level 3: Weekly ────┤
+   ↑                │ 汇总 Daily
+Level 2: Daily ─────┤
+   ↑                │ 汇总 Items
+Level 1: Items ─────┘ (Inbox DB → status=ready)
 ```
 
 ### Chrome 远程调试
@@ -168,13 +184,20 @@ daily-digest/
 │
 ├── src/                 # 核心模块
 │   ├── browser.py       # 网页内容抓取（Playwright + CDP）
-│   ├── notion.py        # Notion API 交互
+│   ├── notion.py        # Notion API 交互（Inbox DB）
 │   ├── llm.py           # AI 摘要/分类（OpenAI）
 │   ├── digest.py        # Digest 构建逻辑
 │   ├── preprocess.py    # 预处理（字段校验、标题补齐）
 │   ├── routing.py       # 条目类型路由
 │   ├── dedupe.py        # URL 去重逻辑
-│   └── utils.py         # 工具函数
+│   ├── utils.py         # 工具函数
+│   │
+│   └── reporting/       # 递归汇总报告模块
+│       ├── models.py           # 数据模型（ReportType, ReportPeriod）
+│       ├── date_utils.py       # 日期范围计算
+│       ├── builder.py          # 报告构建器（Daily/Weekly/Monthly）
+│       ├── service.py          # 报告生成服务
+│       └── notion_reporting.py # Notion API 交互（Report DB）
 │
 ├── scripts/             # 辅助脚本
 │   ├── notion_align_schema.py  # 数据库 Schema 对齐
@@ -189,63 +212,51 @@ daily-digest/
 | 模块 | 职责 |
 |------|------|
 | `browser.py` | 通过 Chrome CDP 抓取网页内容，支持 Twitter 特殊处理 |
-| `notion.py` | Notion API 封装，包括查询、更新、创建页面 |
+| `notion.py` | Notion API 封装（Inbox DB），查询、更新、创建页面 |
 | `llm.py` | OpenAI 调用，生成摘要、概述、分类 |
-| `digest.py` | 构建 Digest 数据结构，按 ItemType 分组 |
 | `preprocess.py` | 预处理流程，校验字段、补齐标题、路由分类 |
 | `routing.py` | 条目类型判断（URL_RESOURCE / NOTE_CONTENT / EMPTY_INVALID） |
-| `dedupe.py` | URL 规范化和重复检测 |
-| `utils.py` | 日志配置、环境变量读取、时区处理 |
+| `reporting/` | 递归汇总报告模块（Daily→Weekly→Monthly） |
 
 ## 🔄 工作流程
 
+### 整体架构
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     Notion 数据库                                │
-│                   (待处理条目: To Read)                          │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      预处理 (preprocess)                         │
-│  • 校验必填字段 (Name, URL/Content)                              │
-│  • 补齐缺失标题                                                  │
-│  • 路由分类 (URL_RESOURCE / NOTE_CONTENT / EMPTY_INVALID)        │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     内容抓取 (browser)                           │
-│  • 连接 Chrome CDP                                               │
-│  • 抓取页面 HTML                                                 │
-│  • 提取正文内容 (trafilatura)                                    │
-│  • Twitter 特殊处理 + 截图                                       │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      AI 处理 (llm)                               │
-│  • 内容分类 + 标签                                               │
-│  • 生成 TLDR 摘要                                                │
-│  • 提取要点 (Highlights)                                         │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Digest 构建 (digest)                          │
-│  • 生成综合概述 (100-150字)                                      │
-│  • 按 ItemType 分组                                              │
-│  • 构建结构化输出                                                 │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     Notion 输出                                  │
-│                   (Digest 页面)                                  │
-│  📋 综合概述                                                     │
-│  🔗 网页内容 (标题 + 要点 + 链接)                                 │
-│  📝 笔记内容 (标题 + 链接)                                        │
+│                        系统架构                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────────┐      ┌──────────────────┐                 │
+│  │  python main.py  │      │  python main.py  │                 │
+│  │     process      │      │     report       │                 │
+│  │  (处理新 items)   │      │  (生成报告)       │                 │
+│  └────────┬─────────┘      └────────┬─────────┘                 │
+│           │                         │                            │
+│           ▼                         ▼                            │
+│  ┌──────────────────┐      ┌──────────────────┐                 │
+│  │    Inbox DB      │──────▶│   Report DB      │                 │
+│  │   (原始条目)      │      │ (Daily/Weekly/   │                 │
+│  │                  │      │  Monthly 报告)    │                 │
+│  └──────────────────┘      └──────────────────┘                 │
+│                                                                  │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+### process 流程（处理新 Items）
+
+```
+Inbox DB (To Read) → 预处理 → 内容抓取 → AI 摘要 → Inbox DB (ready)
+```
+
+### report 流程（递归汇总）
+
+```
+Daily Report  ← Inbox DB (ready items for date)
+    ↓
+Weekly Report ← Report DB (Daily reports for week)
+    ↓
+Monthly Report ← Report DB (Weekly reports for month)
 ```
 
 ## ❓ FAQ
@@ -273,14 +284,24 @@ daily-digest/
 
 ### Q: 如何添加新的待处理内容？
 
-1. 直接在 Notion 数据库中添加新行
+1. 直接在 Notion Inbox 数据库中添加新行
 2. 填写 URL 或内容
 3. Status 设为 "To Read" 或留空
-4. 运行 `python main.py --digest daily`
+4. 运行 `python main.py process` 处理
+5. 运行 `python main.py report --type daily` 生成日报
 
-### Q: Digest 输出在哪里？
+### Q: 报告输出在哪里？
 
-Digest 会创建为 `NOTION_DIGEST_PARENT_ID` 指定页面的子页面，标题格式为 `Digest (daily) 2025-01-01 12:00`。
+报告会创建在 Report 数据库中，包含：
+- **Type**: Daily / Weekly / Monthly
+- **Date**: 报告日期范围
+- **Summary**: AI 生成的概述
+- **Source Items/Reports**: 关联的源数据
+
+### Q: process 和 report 有什么区别？
+
+- `process`: 处理 Inbox 中新收集的内容（抓取+摘要），输出到 Inbox DB
+- `report`: 生成汇总报告（日报/周报/月报），输出到 Report DB
 
 ## 📄 License
 

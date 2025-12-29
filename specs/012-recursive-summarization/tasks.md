@@ -12,9 +12,9 @@
 
 ---
 
-## Phase 1: Foundation
+## Phase 1: Foundation ✅
 
-### T001: Create reporting module structure
+### T001: Create reporting module structure ✅
 **Goal**: Set up the `src/reporting/` module directory structure
 
 **Files to create**:
@@ -25,8 +25,8 @@
 - `src/reporting/service.py`
 
 **Acceptance Criteria**:
-- [ ] All files created with proper imports in `__init__.py`
-- [ ] Module is importable: `from src.reporting import *`
+- [x] All files created with proper imports in `__init__.py`
+- [x] Module is importable: `from src.reporting import *`
 
 ---
 
@@ -54,13 +54,13 @@ class ReportPeriod:
 ```
 
 **Acceptance Criteria**:
-- [ ] `ReportType` enum with Daily, Weekly, Monthly values
-- [ ] `ReportPeriod` dataclass with type, start_date, end_date
-- [ ] `title` property generates correct titles for each type
+- [x] `ReportType` enum with Daily, Weekly, Monthly values
+- [x] `ReportPeriod` dataclass with type, start_date, end_date
+- [x] `title` property generates correct titles for each type
 
 ---
 
-### T003: Implement ReportData dataclass
+### T003: Implement ReportData dataclass ✅
 **Goal**: Define the data structure for report content
 
 **File**: `src/reporting/models.py`
@@ -77,12 +77,12 @@ class ReportData:
 ```
 
 **Acceptance Criteria**:
-- [ ] Dataclass holds all report content
-- [ ] Can be serialized and passed to Notion API
+- [x] Dataclass holds all report content
+- [x] Can be serialized and passed to Notion API
 
 ---
 
-### T004: Implement date utility functions
+### T004: Implement date utility functions ✅
 **Goal**: Create date range calculation functions
 
 **File**: `src/reporting/date_utils.py`
@@ -93,14 +93,14 @@ class ReportData:
 - `get_monthly_range(target_date) -> (first_day, last_day)`
 
 **Acceptance Criteria**:
-- [ ] `get_daily_range` returns same date for start and end
-- [ ] `get_weekly_range` returns Monday-Sunday (ISO week)
-- [ ] `get_monthly_range` handles December correctly (year rollover)
-- [ ] All functions handle edge cases (month boundaries)
+- [x] `get_daily_range` returns same date for start and end
+- [x] `get_weekly_range` returns Monday-Sunday (ISO week)
+- [x] `get_monthly_range` handles December correctly (year rollover)
+- [x] All functions handle edge cases (month boundaries)
 
 ---
 
-### T005: Write tests for date utilities
+### T005: Write tests for date utilities ✅
 **Goal**: Ensure date calculations are correct
 
 **File**: `tests/test_date_utils.py`
@@ -111,12 +111,12 @@ class ReportData:
 - Monthly: normal month, December, February (leap year)
 
 **Acceptance Criteria**:
-- [ ] All date range calculations tested
-- [ ] Edge cases covered (year boundary, leap year)
+- [x] All date range calculations tested
+- [x] Edge cases covered (year boundary, leap year)
 
 ---
 
-### T006: Add environment variables for Reporting DB
+### T006: Add environment variables for Reporting DB ✅
 **Goal**: Configure Notion Reporting database connection
 
 **Files**: `.env.example`, `src/utils.py`
@@ -128,13 +128,13 @@ DIGEST_TIMEZONE=Asia/Shanghai
 ```
 
 **Acceptance Criteria**:
-- [ ] `.env.example` updated with new variables
-- [ ] `get_env()` or similar can read these values
-- [ ] Default timezone fallback if not set
+- [x] `.env.example` updated with new variables
+- [x] `get_env()` or similar can read these values
+- [x] Default timezone fallback if not set
 
 ---
 
-### T007: Create ReportingDBManager skeleton
+### T007: Create ReportingDBManager skeleton ✅
 **Goal**: Set up Notion manager for Reporting database
 
 **File**: `src/reporting/notion_reporting.py` (new)
@@ -159,15 +159,15 @@ class ReportingDBManager:
 ```
 
 **Acceptance Criteria**:
-- [ ] Class structure defined
-- [ ] Database ID loaded from environment
-- [ ] Method signatures defined (can be pass/NotImplemented)
+- [x] Class structure defined
+- [x] Database ID loaded from environment
+- [x] Method signatures defined (can be pass/NotImplemented)
 
 ---
 
-## Phase 2: Daily Digest
+## Phase 2: Daily Digest ✅
 
-### T008: Implement ReportingDBManager.find_report
+### T008: Implement ReportingDBManager.find_report ✅
 **Goal**: Query existing reports to prevent duplicates
 
 **File**: `src/reporting/notion_reporting.py`
@@ -177,13 +177,13 @@ class ReportingDBManager:
 - Return first match or None
 
 **Acceptance Criteria**:
-- [ ] Returns existing report if found
-- [ ] Returns None if no match
-- [ ] Handles API errors gracefully
+- [x] Returns existing report if found
+- [x] Returns None if no match
+- [x] Handles API errors gracefully
 
 ---
 
-### T009: Implement ReportingDBManager.create_report
+### T009: Implement ReportingDBManager.create_report ✅
 **Goal**: Create report pages in Notion
 
 **File**: `src/reporting/notion_reporting.py`
@@ -195,13 +195,13 @@ class ReportingDBManager:
 - Handle 100-block limit (batch if needed)
 
 **Acceptance Criteria**:
-- [ ] Creates page with correct properties
-- [ ] Sets relations to source items
-- [ ] Handles large content (>100 blocks)
+- [x] Creates page with correct properties
+- [x] Sets relations to source items
+- [x] Handles large content (>100 blocks)
 
 ---
 
-### T010: Implement daily digest LLM prompt
+### T010: Implement daily digest LLM prompt ✅
 **Goal**: Add prompt for generating daily knowledge map
 
 **File**: `src/llm.py`
@@ -219,13 +219,13 @@ def generate_daily_digest(items: List[Dict]) -> Dict[str, Any]:
 **Prompt**: See plan.md - Daily Synthesis Prompt
 
 **Acceptance Criteria**:
-- [ ] Calls OpenAI with structured prompt
-- [ ] Returns overview (100-150 chars) and highlights (3-5 items)
-- [ ] Falls back gracefully if AI unavailable
+- [x] Calls OpenAI with structured prompt
+- [x] Returns overview (100-150 chars) and highlights (3-5 items)
+- [x] Falls back gracefully if AI unavailable
 
 ---
 
-### T011: Implement DailyReportBuilder
+### T011: Implement DailyReportBuilder ✅
 **Goal**: Build daily report content from Inbox items
 
 **File**: `src/reporting/builder.py`
@@ -237,13 +237,13 @@ def generate_daily_digest(items: List[Dict]) -> Dict[str, Any]:
 4. Return `ReportData`
 
 **Acceptance Criteria**:
-- [ ] Groups items by tag correctly
-- [ ] Generates overview and highlights
-- [ ] Creates valid Notion blocks
+- [x] Groups items by tag correctly
+- [x] Generates overview and highlights
+- [x] Creates valid Notion blocks
 
 ---
 
-### T012: Implement DigestService.generate_daily
+### T012: Implement DigestService.generate_daily ✅
 **Goal**: Orchestrate daily digest generation
 
 **File**: `src/reporting/service.py`
@@ -257,13 +257,13 @@ def generate_daily_digest(items: List[Dict]) -> Dict[str, Any]:
 6. Return page_id
 
 **Acceptance Criteria**:
-- [ ] Skips if report exists (returns existing page_id)
-- [ ] Queries correct items from Inbox
-- [ ] Creates complete daily report
+- [x] Skips if report exists (returns existing page_id)
+- [x] Queries correct items from Inbox
+- [x] Creates complete daily report
 
 ---
 
-### T013: Add CLI command for daily digest
+### T013: Add CLI command for daily digest ✅
 **Goal**: Enable manual daily digest generation
 
 **File**: `main.py`
@@ -274,14 +274,14 @@ python main.py digest --type daily [--date 2025-01-15]
 ```
 
 **Acceptance Criteria**:
-- [ ] Command accepts `--type daily`
-- [ ] Optional `--date` defaults to today
-- [ ] Outputs page_id on success
-- [ ] Shows error message on failure
+- [x] Command accepts `--type daily`
+- [x] Optional `--date` defaults to today
+- [x] Outputs page_id on success
+- [x] Shows error message on failure
 
 ---
 
-### T014: Write tests for daily digest flow
+### T014: Write tests for daily digest flow ✅
 **Goal**: Verify daily digest generation
 
 **File**: `tests/test_daily_digest.py`
@@ -292,14 +292,14 @@ python main.py digest --type daily [--date 2025-01-15]
 - End-to-end with mocked Notion/LLM
 
 **Acceptance Criteria**:
-- [ ] DailyReportBuilder unit tests pass
-- [ ] DigestService integration tests pass
+- [x] DailyReportBuilder unit tests pass
+- [x] DigestService integration tests pass
 
 ---
 
-## Phase 3: Weekly Digest
+## Phase 3: Weekly Digest ✅
 
-### T015: Implement ReportingDBManager.query_reports_in_range
+### T015: Implement ReportingDBManager.query_reports_in_range ✅
 **Goal**: Query daily reports within a week
 
 **File**: `src/reporting/notion_reporting.py`
@@ -310,13 +310,13 @@ python main.py digest --type daily [--date 2025-01-15]
 - Return list of report dicts
 
 **Acceptance Criteria**:
-- [ ] Returns all daily reports in range
-- [ ] Sorted chronologically
-- [ ] Handles empty results
+- [x] Returns all daily reports in range
+- [x] Sorted chronologically
+- [x] Handles empty results
 
 ---
 
-### T016: Implement weekly trends LLM prompt
+### T016: Implement weekly trends LLM prompt ✅
 **Goal**: Generate weekly synthesis from daily summaries
 
 **File**: `src/llm.py`
@@ -332,14 +332,14 @@ def generate_weekly_digest(daily_reports: List[Dict]) -> Dict[str, Any]:
 ```
 
 **Acceptance Criteria**:
-- [ ] Identifies hot topics (frequent)
-- [ ] Identifies emerging topics (new this week)
-- [ ] Identifies fading topics (disappeared)
-- [ ] Generates 150-200 word overview
+- [x] Identifies hot topics (frequent)
+- [x] Identifies emerging topics (new this week)
+- [x] Identifies fading topics (disappeared)
+- [x] Generates 150-200 word overview
 
 ---
 
-### T017: Implement WeeklyReportBuilder
+### T017: Implement WeeklyReportBuilder ✅
 **Goal**: Build weekly report from daily reports
 
 **File**: `src/reporting/builder.py`
@@ -351,13 +351,13 @@ def generate_weekly_digest(daily_reports: List[Dict]) -> Dict[str, Any]:
 4. Return `ReportData` with daily report IDs as sources
 
 **Acceptance Criteria**:
-- [ ] Uses daily summaries, NOT raw items
-- [ ] Includes trend visualization
-- [ ] Links to daily reports
+- [x] Uses daily summaries, NOT raw items
+- [x] Includes trend visualization
+- [x] Links to daily reports
 
 ---
 
-### T018: Implement DigestService.generate_weekly
+### T018: Implement DigestService.generate_weekly ✅
 **Goal**: Orchestrate weekly digest generation
 
 **File**: `src/reporting/service.py`
@@ -370,13 +370,13 @@ def generate_weekly_digest(daily_reports: List[Dict]) -> Dict[str, Any]:
 5. Build and create report
 
 **Acceptance Criteria**:
-- [ ] Skips if weekly report exists
-- [ ] Warns about missing daily reports
-- [ ] Creates weekly with relations to dailies
+- [x] Skips if weekly report exists
+- [x] Warns about missing daily reports
+- [x] Creates weekly with relations to dailies
 
 ---
 
-### T019: Write tests for weekly digest flow
+### T019: Write tests for weekly digest flow ✅
 **Goal**: Verify weekly digest generation
 
 **File**: `tests/test_weekly_digest.py`
@@ -387,14 +387,14 @@ def generate_weekly_digest(daily_reports: List[Dict]) -> Dict[str, Any]:
 - Trend identification logic
 
 **Acceptance Criteria**:
-- [ ] WeeklyReportBuilder tests pass
-- [ ] Service handles incomplete weeks
+- [x] WeeklyReportBuilder tests pass
+- [x] Service handles incomplete weeks
 
 ---
 
-## Phase 4: Monthly Digest
+## Phase 4: Monthly Digest ✅
 
-### T020: Implement monthly review LLM prompt
+### T020: Implement monthly review LLM prompt ✅
 **Goal**: Generate monthly knowledge review
 
 **File**: `src/llm.py`
@@ -410,13 +410,13 @@ def generate_monthly_digest(weekly_reports: List[Dict]) -> Dict[str, Any]:
 ```
 
 **Acceptance Criteria**:
-- [ ] Identifies dominant monthly themes
-- [ ] Tracks topic evolution
-- [ ] Generates 200-250 word overview
+- [x] Identifies dominant monthly themes
+- [x] Tracks topic evolution
+- [x] Generates 200-250 word overview
 
 ---
 
-### T021: Implement MonthlyReportBuilder
+### T021: Implement MonthlyReportBuilder ✅
 **Goal**: Build monthly report from weekly reports
 
 **File**: `src/reporting/builder.py`
@@ -428,13 +428,13 @@ def generate_monthly_digest(weekly_reports: List[Dict]) -> Dict[str, Any]:
 4. Return `ReportData` with weekly report IDs as sources
 
 **Acceptance Criteria**:
-- [ ] Uses weekly summaries, NOT dailies
-- [ ] Shows topic evolution over month
-- [ ] Links to weekly reports
+- [x] Uses weekly summaries, NOT dailies
+- [x] Shows topic evolution over month
+- [x] Links to weekly reports
 
 ---
 
-### T022: Implement DigestService.generate_monthly
+### T022: Implement DigestService.generate_monthly ✅
 **Goal**: Orchestrate monthly digest generation
 
 **File**: `src/reporting/service.py`
@@ -447,13 +447,13 @@ def generate_monthly_digest(weekly_reports: List[Dict]) -> Dict[str, Any]:
 5. Build and create report
 
 **Acceptance Criteria**:
-- [ ] Skips if monthly report exists
-- [ ] Warns about missing weekly reports
-- [ ] Creates monthly with relations to weeklies
+- [x] Skips if monthly report exists
+- [x] Warns about missing weekly reports
+- [x] Creates monthly with relations to weeklies
 
 ---
 
-### T023: Add CLI commands for weekly/monthly
+### T023: Add CLI commands for weekly/monthly ✅
 **Goal**: Enable manual weekly/monthly digest generation
 
 **File**: `main.py`
@@ -465,13 +465,13 @@ python main.py digest --type monthly [--date 2025-01-15]
 ```
 
 **Acceptance Criteria**:
-- [ ] `--type weekly` generates for current week
-- [ ] `--type monthly` generates for current month
-- [ ] Date option targets specific period
+- [x] `--type weekly` generates for current week
+- [x] `--type monthly` generates for current month
+- [x] Date option targets specific period
 
 ---
 
-### T024: Write tests for monthly digest flow
+### T024: Write tests for monthly digest flow ✅
 **Goal**: Verify monthly digest generation
 
 **File**: `tests/test_monthly_digest.py`
@@ -482,14 +482,14 @@ python main.py digest --type monthly [--date 2025-01-15]
 - Theme evolution tracking
 
 **Acceptance Criteria**:
-- [ ] MonthlyReportBuilder tests pass
-- [ ] Service handles edge cases
+- [x] MonthlyReportBuilder tests pass
+- [x] Service handles edge cases
 
 ---
 
-## Phase 5: Polish
+## Phase 5: Polish ✅
 
-### T025: Implement duplicate prevention
+### T025: Implement duplicate prevention ✅
 **Goal**: Ensure idempotent report generation
 
 **File**: `src/reporting/service.py`
@@ -500,13 +500,13 @@ python main.py digest --type monthly [--date 2025-01-15]
 - Log info message about skipping
 
 **Acceptance Criteria**:
-- [ ] Running twice returns same page_id
-- [ ] No duplicate reports created
-- [ ] Clear logging of skip action
+- [x] Running twice returns same page_id
+- [x] No duplicate reports created
+- [x] Clear logging of skip action
 
 ---
 
-### T026: Add missing report warnings
+### T026: Add missing report warnings ✅
 **Goal**: Alert when lower-level reports are missing
 
 **File**: `src/reporting/service.py`
@@ -517,13 +517,13 @@ python main.py digest --type monthly [--date 2025-01-15]
 - Continue processing with available reports
 
 **Acceptance Criteria**:
-- [ ] Warning logged for each missing report
-- [ ] Processing continues with partial data
-- [ ] Final report notes missing sources
+- [x] Warning logged for each missing report
+- [x] Processing continues with partial data
+- [x] Final report notes missing sources
 
 ---
 
-### T027: Support retroactive generation
+### T027: Support retroactive generation ✅
 **Goal**: Generate reports for past periods
 
 **Implementation**:
@@ -532,9 +532,9 @@ python main.py digest --type monthly [--date 2025-01-15]
 - Add option to force regenerate: `--force`
 
 **Acceptance Criteria**:
-- [ ] Can generate reports for any past date
-- [ ] Rejects future dates
-- [ ] `--force` overwrites existing report
+- [x] Can generate reports for any past date
+- [x] Rejects future dates
+- [x] `--force` overwrites existing report
 
 ---
 

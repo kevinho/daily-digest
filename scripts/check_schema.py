@@ -61,9 +61,7 @@ def main() -> int:
         "Tags": {"multi_select"},
         "Rule Version": {"rich_text"},
         "Prompt Version": {"rich_text"},
-    }
-    optional = {
-        "Reason": {"rich_text"},  # audit/notes
+        "Reason": {"rich_text"},  # audit/notes now mandatory
     }
 
     found = {}
@@ -78,8 +76,6 @@ def main() -> int:
             missing.append(name)
         elif found[name] not in allowed_types:
             type_mismatch.append((name, found[name], allowed_types))
-
-    optional_missing = [n for n in optional if n not in found]
 
     print("=== Notion properties detected ===")
     for name, ptype in sorted(found.items()):
@@ -96,9 +92,6 @@ def main() -> int:
     else:
         print("\n[PASS] All required properties present with acceptable types.")
         status = 0
-
-    if optional_missing:
-        print(f"\n[Info] Optional missing: {', '.join(optional_missing)}")
 
     return status
 

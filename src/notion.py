@@ -197,6 +197,17 @@ class NotionManager:
     def _update_status(self, page_id: str, status: str, extra_props: Optional[Dict[str, Any]] = None) -> None:
         self._set_status(page_id, status, extra_props)
 
+    def _update_with_reason_fallback(self, page_id: str, props: Dict[str, Any]) -> None:
+        try:
+            self.client.pages.update(page_id=page_id, properties=props)
+            return
+        except APIResponseError as exc:
+            if self.prop.reason in props and "property" in str(exc).lower() and "exists" in str(exc).lower():
+                trimmed = {k: v for k, v in props.items() if k != self.prop.reason}
+                self.client.pages.update(page_id=page_id, properties=trimmed)
+                return
+            raise
+
     def _with_reason(self, note: Optional[str], props: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         merged: Dict[str, Any] = props.copy() if props else {}
         if note:

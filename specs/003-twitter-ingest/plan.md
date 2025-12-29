@@ -5,18 +5,18 @@
 
 ## Summary
 
-抓取 Twitter/X 内容并写入 Notion，需在已登录、合法 CDP 浏览器中规避反爬与登录墙；支持 save to notion 插件保存的条目，字段一致，标记来源；重复运行幂等，失败可重试。
+启动时先跑预处理，校验/回填必填字段并对 tweet 链接自动调用抓取；抓取在已登录、合法 CDP 浏览器中规避反爬与登录墙；支持 save to notion 插件保存的条目，字段一致并标记来源；重复运行幂等，失败可重试。
 
 ## Technical Context
 
 **Language/Version**: Python 3.11  
-**Primary Dependencies**: Playwright (CDP/反爬规避)、notion-client、httpx/requests；可选 OpenAI/trafilatura 仅用于其他功能，非本抓取核心。  
-**Storage**: Notion Data Source DB（已用 `Reason` 等字段）。  
+**Primary Dependencies**: Playwright (CDP/反爬规避)、notion-client、httpx/requests；预处理/抓取在同一流程中运行。可选 OpenAI/trafilatura 仅用于其他功能，非本抓取核心。  
+**Storage**: Notion Data Source DB（字段含 Reason + Source + Canonical URL + Raw Content 等）。  
 **Testing**: pytest（单测/集成）。  
 **Target Platform**: macOS 桌面，已登录的调试 Chrome（remote debugging）或 Playwright 启动的合法浏览器。  
 **Project Type**: 单仓库 Python CLI/批处理。  
 **Performance Goals**: 单条抓取 p95 ≤5s，在登录可访问时成功率≥90%；批量（几十条）≤1min。  
-**Constraints**: 必须使用合法浏览器会话；不抓取私有/不可访问内容；阻断时写 Reason，不写错误正文；保持幂等，避免重复写入。  
+**Constraints**: 必须使用合法浏览器会话；不抓取私有/不可访问内容；阻断时写 Reason，不写错误正文；保持幂等，避免重复写入；预处理是必跑阶段（开机先跑）。  
 **Scale/Scope**: 个人/小规模（几十到上百条）。  
 
 ## Constitution Check

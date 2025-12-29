@@ -157,3 +157,28 @@ def test_retry_after_block(monkeypatch):
     assert res_ok == "success"
     assert notion.classifications["5"]["raw_content"] == "hi"
 
+
+def test_plugin_source(monkeypatch):
+    notion = StubNotion()
+
+    async def _ok(url, cdp_url):
+        return "Plugin tweet"
+
+    monkeypatch.setattr("main.fetch_page_content", _ok)
+    monkeypatch.setattr(
+        "main.classify",
+        lambda text: {
+            "tags": ["twitter"],
+            "sensitivity": "public",
+            "confidence": 0.9,
+            "rule_version": "r",
+            "prompt_version": "p",
+        },
+    )
+    monkeypatch.setattr("main.generate_digest", lambda text: {"tldr": "TLDR", "insights": ""})
+    page = {"id": "6", "url": "https://x.com/user/status/777", "attachments": [], "source": "plugin"}
+    res = main.process_item(page, notion, "http://localhost:9222")
+    assert res == "success"
+    assert notion.classifications["6"]["source"] == "plugin"
+    assert notion.done["6"]["status"] == notion.status.ready
+

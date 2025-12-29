@@ -246,10 +246,9 @@ Commands:
   report     Generate hierarchical reports (daily/weekly/monthly)
 
 Examples:
-  python main.py process                    # Process all pending items
-  python main.py process --preprocess-only  # Only preprocess (no fetch)
-  python main.py report --type daily        # Generate today's daily report
-  python main.py report --type weekly       # Generate this week's report
+  python main.py process              # Process all pending items
+  python main.py report --type daily  # Generate today's daily report
+  python main.py report --type weekly # Generate this week's report
         """
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -258,18 +257,6 @@ Examples:
     process_parser = subparsers.add_parser(
         "process",
         help="Process new items from Inbox (preprocess + fetch + summarize)"
-    )
-    process_parser.add_argument(
-        "--preprocess-only",
-        dest="preprocess_only",
-        action="store_true",
-        help="Only run preprocessing (backfill Name, validate URL/Content), skip fetch and summarize",
-    )
-    process_parser.add_argument(
-        "--digest",
-        dest="digest_window",
-        default=None,
-        help="After processing, trigger manual digest (e.g., daily/weekly/monthly/custom)",
     )
     
     # Report subcommand - for hierarchical reporting system
@@ -300,7 +287,7 @@ Examples:
     args = parser.parse_args()
     
     if args.command == "process":
-        main(digest_window=args.digest_window, preprocess_only=args.preprocess_only)
+        main(digest_window=None, preprocess_only=False)
     elif args.command == "report":
         page_id = generate_report(args.report_type, args.target_date, args.force)
         if page_id:

@@ -23,29 +23,11 @@ except ImportError:
         return None
 
 
-DEFAULT_ANTI_BOT_ARGS = [
-    "--disable-blink-features=AutomationControlled",
-    "--no-sandbox",
-]
-
-DEFAULT_INIT_SCRIPT = """
-// Remove webdriver
-Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-// Fake plugins
-Object.defineProperty(navigator, 'plugins', { get: () => [1,2,3,4,5] });
-"""
+from src.utils import get_antibot_settings
 
 
 def _page_options(override: Optional[Dict] = None) -> Dict:
-    base = {
-        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
-        "viewport": {"width": 1280, "height": 720},
-        "device_scale_factor": 2,
-        "has_touch": False,
-        "is_mobile": False,
-        "locale": "en-US",
-        "timezone_id": "America/Los_Angeles",
-    }
+    base = get_antibot_settings()
     if override:
         base.update(override)
     return base
@@ -65,7 +47,7 @@ async def fetch_page_content(
     url: str,
     cdp_url: str = "http://localhost:9222",
     timeout_ms: int = 15000,
-    anti_bot: bool = True,
+    anti_bot: Optional[bool] = None,
     page_options: Optional[Dict] = None,
 ) -> Optional[str]:
     # Lazy import to avoid hard dependency at module import time (helps tests without playwright installed)
@@ -80,6 +62,7 @@ async def fetch_page_content(
         raise RuntimeError("trafilatura is required to extract text") from exc
 
     opts = _page_options(page_options)
+    anti_bot_enabled = opts.get("enable") if anti_bot is None else anti_bot
 
     async with async_playwright() as p:
         browser = await p.chromium.connect_over_cdp(cdp_url)
@@ -93,8 +76,8 @@ async def fetch_page_content(
             timezone_id=opts.get("timezone_id"),
         )
         page = await context.new_page()
-        if anti_bot:
-            await context.add_init_script(DEFAULT_INIT_SCRIPT)
+        if anti_bot_enabled and opts.get("init_script"):
+            await context.add_init_script(opts["init_script"])
         try:
             await page.goto(url, wait_until="load", timeout=timeout_ms)
             html = await page.content()

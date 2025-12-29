@@ -35,6 +35,54 @@ def get_timezone() -> timezone:
     return timezone.utc
 
 
+def _parse_bool(val: Optional[str], default: bool) -> bool:
+    if val is None:
+        return default
+    return val.lower() in ("1", "true", "yes", "on")
+
+
+def _parse_viewport(val: Optional[str]) -> Optional[dict]:
+    if not val:
+        return None
+    parts = val.lower().replace("x", " ").split()
+    if len(parts) != 2:
+        return None
+    try:
+        w, h = int(parts[0]), int(parts[1])
+        return {"width": w, "height": h}
+    except Exception:
+        return None
+
+
+def get_antibot_settings() -> dict:
+    """Load anti-bot/UA/viewport settings from env."""
+    ua_default = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
+    viewport_default = {"width": 1280, "height": 720}
+    init_script_default = """
+// Remove webdriver
+Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+// Fake plugins
+Object.defineProperty(navigator, 'plugins', { get: () => [1,2,3,4,5] });
+"""
+    args_env = os.getenv("ANTI_BOT_ARGS")
+    args_list = args_env.split() if args_env else [
+        "--disable-blink-features=AutomationControlled",
+        "--no-sandbox",
+    ]
+    viewport_env = _parse_viewport(os.getenv("ANTI_BOT_VIEWPORT"))
+    return {
+        "enable": _parse_bool(os.getenv("ANTI_BOT_ENABLE"), True),
+        "args": args_list,
+        "init_script": os.getenv("ANTI_BOT_INIT_SCRIPT", init_script_default),
+        "user_agent": os.getenv("ANTI_BOT_USER_AGENT", ua_default),
+        "viewport": viewport_env or viewport_default,
+        "device_scale_factor": float(os.getenv("ANTI_BOT_DEVICE_SCALE", "2")),
+        "has_touch": _parse_bool(os.getenv("ANTI_BOT_HAS_TOUCH"), False),
+        "is_mobile": _parse_bool(os.getenv("ANTI_BOT_IS_MOBILE"), False),
+        "locale": os.getenv("ANTI_BOT_LOCALE", "en-US"),
+        "timezone_id": os.getenv("ANTI_BOT_TIMEZONE", "America/Los_Angeles"),
+    }
+
 def normalize_tweet_url(url: str) -> Optional[str]:
     """Return normalized tweet URL if valid, else None."""
     from urllib.parse import urlparse

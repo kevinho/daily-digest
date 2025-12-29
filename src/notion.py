@@ -403,6 +403,38 @@ class NotionManager:
             },
         }
 
+    def _block_quote_header(self, text: str) -> Dict[str, Any]:
+        """Create a quote block header (italic, gray)."""
+        return {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+                "rich_text": [
+                    {
+                        "type": "text",
+                        "text": {"content": text},
+                        "annotations": {"italic": True, "color": "gray"},
+                    }
+                ]
+            },
+        }
+
+    def _block_quote_item(self, text: str) -> Dict[str, Any]:
+        """Create a quote-style item (indented, gray text)."""
+        return {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+                "rich_text": [
+                    {
+                        "type": "text",
+                        "text": {"content": f"  • {text[:1900]}"},
+                        "annotations": {"color": "gray"},
+                    }
+                ]
+            },
+        }
+
     # ================================================================
     # Digest Page Creation
     # ================================================================
@@ -451,17 +483,17 @@ class NotionManager:
                 page_link = item.get("page_link", "")
                 children_blocks.append(self._block_callout(item_title, "📌", page_link if page_link else None))
                 
-                # TLDR summary with label
+                # TLDR summary with label (prominent)
                 highlights = item.get("highlights", [])
                 if highlights:
-                    # First highlight as TLDR
+                    # First highlight as TLDR - bold label
                     children_blocks.append(self._block_labeled_text("TLDR: ", highlights[0] if highlights else ""))
                     
-                    # Remaining highlights as Insights
+                    # Remaining highlights as Insights - lighter style, no clicks
                     if len(highlights) > 1:
-                        children_blocks.append(self._block_labeled_text("Insights:", ""))
+                        children_blocks.append(self._block_quote_header("Insights"))
                         for h in highlights[1:]:
-                            children_blocks.append(self._block_bullet(h))
+                            children_blocks.append(self._block_quote_item(h))
                 
                 # Source URL
                 url = item.get("url", "")

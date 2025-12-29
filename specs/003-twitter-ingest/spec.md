@@ -20,24 +20,24 @@
   - Demonstrated to users independently
 -->
 
-### User Story 1 - 基础抓取（合法浏览器/CDP） (Priority: P1)
+### User Story 1 - 预处理+Twitter 抓取融合（Priority: P1）
 
-在已登录、合法的桌面浏览器/CDP 会话中，抓取指定 tweet/X 页面正文并写入 Notion，规避反爬与登录墙。
+启动流程必先运行预处理：校验 Name/URL/Content，回填缺失；对 tweet 链接自动调用 Twitter 抓取（已登录合法浏览器/CDP），抓取正文并写入 Notion，规避反爬与登录墙。
 
 **Why this priority**: 基础抓取是后续所有自动化和插件集成的前提。
 
-**Independent Test**: 提供一条可访问的 tweet 链接，运行抓取，验证正文、Canonical URL、状态写入 Notion，且遇到阻断时报错不写入错误正文。
+**Independent Test**: 启动主流程，预处理阶段对 tweet 链接自动调用抓取；验证正文、Canonical URL、Source/Reason、状态写入 Notion；阻断时报错不写入错误正文，流程不中断。
 
 **Acceptance Scenarios**:
 
-1. **Given** 已登录 CDP 浏览器，**When** 抓取一条可访问 tweet，**Then** 正文写入 Notion，状态为 ready/pending，记录 Canonical URL。
-2. **Given** 返回登录墙/JS 阻断页，**When** 抓取，**Then** 状态标记 Error，Reason 说明阻断原因，不写入错误正文。
+1. **Given** 已登录 CDP 浏览器，**When** 预处理遇到可访问 tweet，**Then** 自动抓取正文写入 Notion，状态 ready/pending，记录 Canonical URL/Source。
+2. **Given** 返回登录墙/JS 阻断页，**When** 抓取，**Then** 状态 Error，Reason 说明阻断原因，流程继续处理其他项。
 
 ---
 
 ### User Story 2 - 插件深度抓取（参考 save to notion） (Priority: P1)
 
-对 save to notion 插件保存的 Twitter 条目进行抓取与深度补全，保持字段一致，并标记来源。
+在预处理阶段，同步处理 save to notion 插件保存的 Twitter 条目，复用抓取逻辑，保持字段一致并标记来源。
 
 **Why this priority**: 插件是常用入口，需要与基础抓取同等质量和字段。
 
@@ -52,7 +52,7 @@
 
 ### User Story 3 - 幂等与重复防护 (Priority: P2)
 
-多次运行抓取时，不重复写入成功项；失败项可在条件满足后重试成功；避免重复/冲突。
+预处理+抓取多次运行时，不重复写入成功项；失败项可在条件满足后重试成功；避免重复/冲突。
 
 **Why this priority**: 保证数据质量和可运营性，避免污染 Notion。
 

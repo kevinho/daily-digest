@@ -147,15 +147,16 @@ def generate_overview_fallback(items: List[Dict]) -> str:
     return overview[:200]  # Limit length
 
 
-def categorize_items(items: List[Dict]) -> Dict[str, List[int]]:
+def categorize_items(items: List[Dict]) -> Dict[str, Dict[str, List[int]]]:
     """
-    Use AI to categorize items into meaningful groups.
+    Use AI to categorize items into two-level hierarchy.
     
     Args:
         items: List of items with title, summary/tldr
         
     Returns:
-        Dict mapping category name to list of item indices
+        Dict mapping main category -> subcategory -> list of item indices
+        Example: {"技术": {"AI工具": [0,1], "开源项目": [2,3]}, "投资": {"交易策略": [4,5]}}
     """
     if not items:
         return {}
@@ -177,12 +178,15 @@ def categorize_items(items: List[Dict]) -> Dict[str, List[int]]:
         
         items_text = "\n".join(item_lines)
         
-        prompt = f"""请将以下{len(items)}条内容分类到3-6个有意义的类别中。
+        prompt = f"""请将以下{len(items)}条内容进行两级分类。
 
 要求：
-1. 类别名称要简洁（2-4个字），如"AI教育"、"开源工具"、"投资理财"
-2. 每个内容只分到一个最相关的类别
-3. 返回JSON格式：{{"类别名": [序号列表], ...}}
+1. 一级分类：2-4个主类别（如"技术"、"投资"、"教育"、"生活"）
+2. 二级分类：每个主类别下2-4个子类别（如"AI工具"、"开源项目"）
+3. 类别名称要简洁（2-4个字）
+4. 每个内容只分到一个子类别
+5. 返回JSON格式：
+   {{"主类别1": {{"子类别1": [序号], "子类别2": [序号]}}, "主类别2": {{...}}}}
 
 内容列表：
 {items_text}
@@ -192,7 +196,7 @@ def categorize_items(items: List[Dict]) -> Dict[str, List[int]]:
         resp = client.chat.completions.create(
             model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=500,
+            max_tokens=800,
             temperature=0.3,
         )
         content = resp.choices[0].message.content or "{}"
@@ -212,24 +216,31 @@ def categorize_items(items: List[Dict]) -> Dict[str, List[int]]:
         return _categorize_fallback(items)
 
 
-def _categorize_fallback(items: List[Dict]) -> Dict[str, List[int]]:
-    """Fallback categorization by content_type/item_type."""
-    categories: Dict[str, List[int]] = {}
+def _categorize_fallback(items: List[Dict]) -> Dict[str, Dict[str, List[int]]]:
+    """Fallback two-level categorization by content_type/item_type."""
+    # Group by content type first, then by item type
+    categories: Dict[str, Dict[str, List[int]]] = {}
     
     for i, item in enumerate(items):
-        content_type = (item.get("content_type") or "").upper()
+        content_type = (item.get("content_type") or "HTML").upper()
         item_type = (item.get("item_type") or "").upper()
         
-        if content_type and content_type not in ("HTML", "UNKNOWN", ""):
-            cat = f"📄 {content_type}"
+        # Determine main category
+        if content_type in ("PDF", "IMAGE", "VIDEO", "AUDIO"):
+            main_cat = "📁 文件"
+            sub_cat = content_type
         elif item_type == "NOTE_CONTENT":
-            cat = "📝 笔记"
+            main_cat = "📝 笔记"
+            sub_cat = "个人记录"
         else:
-            cat = "🔗 网页"
+            main_cat = "🔗 网页"
+            sub_cat = "文章"
         
-        if cat not in categories:
-            categories[cat] = []
-        categories[cat].append(i)
+        if main_cat not in categories:
+            categories[main_cat] = {}
+        if sub_cat not in categories[main_cat]:
+            categories[main_cat][sub_cat] = []
+        categories[main_cat][sub_cat].append(i)
     
     return categories
 

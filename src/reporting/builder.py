@@ -84,59 +84,38 @@ class DailyReportBuilder:
             categories=categories,
         )
     
-    def _group_by_tags(self, items: List[Dict]) -> Dict[str, List[Dict]]:
-        """Group items using AI categorization with fallback."""
+    def _group_by_tags(self, items: List[Dict]) -> Dict[str, Dict[str, List[Dict]]]:
+        """Group items into two-level hierarchy using AI categorization."""
         from src.llm import categorize_items
         
-        # First, check if items have meaningful tags
-        has_meaningful_tags = False
-        for item in items:
-            tags = item.get("tags") or []
-            meaningful = [t for t in tags if t.lower() not in ("general", "未分类", "")]
-            if meaningful:
-                has_meaningful_tags = True
-                break
-        
-        # If items have meaningful tags, use them
-        if has_meaningful_tags:
-            return self._group_by_existing_tags(items)
-        
-        # Otherwise, use AI categorization
+        # Use AI two-level categorization
         ai_categories = categorize_items(items)
         
-        # Convert index-based categories to item-based
-        categories: Dict[str, List[Dict]] = {}
+        # Convert index-based categories to item-based (two-level)
+        categories: Dict[str, Dict[str, List[Dict]]] = {}
         assigned_indices = set()
         
-        for cat_name, indices in ai_categories.items():
-            categories[cat_name] = []
-            for idx in indices:
-                if 0 <= idx < len(items):
-                    categories[cat_name].append(items[idx])
-                    assigned_indices.add(idx)
+        for main_cat, sub_cats in ai_categories.items():
+            if not isinstance(sub_cats, dict):
+                # Handle flat structure (fallback compatibility)
+                sub_cats = {"默认": sub_cats if isinstance(sub_cats, list) else []}
+            
+            categories[main_cat] = {}
+            for sub_cat, indices in sub_cats.items():
+                if not isinstance(indices, list):
+                    continue
+                categories[main_cat][sub_cat] = []
+                for idx in indices:
+                    if isinstance(idx, int) and 0 <= idx < len(items):
+                        categories[main_cat][sub_cat].append(items[idx])
+                        assigned_indices.add(idx)
         
         # Add any unassigned items to "其他" category
         unassigned = [items[i] for i in range(len(items)) if i not in assigned_indices]
         if unassigned:
-            categories["其他"] = unassigned
-        
-        return categories
-    
-    def _group_by_existing_tags(self, items: List[Dict]) -> Dict[str, List[Dict]]:
-        """Group items by their existing tags."""
-        categories: Dict[str, List[Dict]] = {}
-        
-        for item in items:
-            tags = item.get("tags") or []
-            meaningful_tags = [t for t in tags if t.lower() not in ("general", "未分类", "")]
-            
-            if not meaningful_tags:
-                meaningful_tags = ["未分类"]
-            
-            for tag in meaningful_tags:
-                if tag not in categories:
-                    categories[tag] = []
-                categories[tag].append(item)
+            if "其他" not in categories:
+                categories["其他"] = {}
+            categories["其他"]["未分类"] = unassigned
         
         return categories
     
@@ -192,16 +171,21 @@ class DailyReportBuilder:
     def _build_content_blocks(
         self,
         items: List[Dict],
-        categories: Dict[str, List[Dict]],
+        categories: Dict[str, Dict[str, List[Dict]]],  # Two-level categories
         highlights: List,  # Can be List[str] or List[Dict]
     ) -> List[Dict]:
-        """Build Notion blocks for the report content."""
+        """Build Notion blocks for the report content with two-level categories."""
         blocks: List[Dict] = []
         
-        # Statistics section
+        # Statistics section - show main categories with subcategory counts
         blocks.append(_heading2(f"📊 统计 ({len(items)}条)"))
-        for cat, cat_items in categories.items():
-            blocks.append(_bullet(f"{cat}: {len(cat_items)}条"))
+        for main_cat, sub_cats in categories.items():
+            if isinstance(sub_cats, dict):
+                total = sum(len(items) for items in sub_cats.values())
+                sub_names = "、".join(sub_cats.keys())
+                blocks.append(_bullet(f"{main_cat}: {total}条 ({sub_names})"))
+            else:
+                blocks.append(_bullet(f"{main_cat}: {len(sub_cats)}条"))
         blocks.append(_divider())
         
         # Highlights section with clickable links
@@ -219,24 +203,37 @@ class DailyReportBuilder:
                     blocks.append(_bullet(h))
             blocks.append(_divider())
         
-        # Items by category with Notion page links
-        for cat, cat_items in categories.items():
-            blocks.append(_heading2(f"📁 {cat} ({len(cat_items)}条)"))
-            for item in cat_items:
-                title = item.get("title", "无标题")
-                summary = item.get("summary", "")
-                url = item.get("url", "")
-                page_link = item.get("page_link", "")
+        # Two-level category display
+        for main_cat, sub_cats in categories.items():
+            if not isinstance(sub_cats, dict):
+                continue
+            
+            # Count total items in main category
+            total_in_main = sum(len(sub_items) for sub_items in sub_cats.values())
+            blocks.append(_heading2(f"📁 {main_cat} ({total_in_main}条)"))
+            
+            for sub_cat, sub_items in sub_cats.items():
+                if not sub_items:
+                    continue
                 
-                # Clean summary: remove TLDR/Insights labels and get first line only
-                display_text = _clean_summary(summary) if summary else title[:80]
+                # Subcategory header (heading3 style)
+                blocks.append(_heading3(f"▸ {sub_cat} ({len(sub_items)}条)"))
                 
-                # Prefer page_link for Notion internal linking, fall back to external URL
-                link = page_link or url
-                if link:
-                    blocks.append(_bullet_with_link(f"📌 {display_text}", link))
-                else:
-                    blocks.append(_bullet(f"📌 {display_text}"))
+                for item in sub_items:
+                    title = item.get("title", "无标题")
+                    summary = item.get("summary", "")
+                    url = item.get("url", "")
+                    page_link = item.get("page_link", "")
+                    
+                    # Clean summary: remove TLDR/Insights labels and get first line only
+                    display_text = _clean_summary(summary) if summary else title[:80]
+                    
+                    # Prefer page_link for Notion internal linking, fall back to external URL
+                    link = page_link or url
+                    if link:
+                        blocks.append(_bullet_with_link(f"📌 {display_text}", link))
+                    else:
+                        blocks.append(_bullet(f"📌 {display_text}"))
             
             blocks.append(_divider())
         
@@ -509,6 +506,17 @@ def _heading2(text: str) -> Dict:
         "object": "block",
         "type": "heading_2",
         "heading_2": {
+            "rich_text": [{"type": "text", "text": {"content": text[:100]}}]
+        },
+    }
+
+
+def _heading3(text: str) -> Dict:
+    """Create a heading_3 block."""
+    return {
+        "object": "block",
+        "type": "heading_3",
+        "heading_3": {
             "rich_text": [{"type": "text", "text": {"content": text[:100]}}]
         },
     }

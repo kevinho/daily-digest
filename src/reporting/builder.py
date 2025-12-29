@@ -316,15 +316,19 @@ class MonthlyReportBuilder:
         
         source_ids = [r.get("id") for r in weekly_reports if r.get("id")]
         
+        # Always extract themes with page links from weekly reports
+        themes_with_links = self._extract_themes(weekly_reports)
+        
         if generate_overview_fn:
             overview_data = generate_overview_fn(weekly_reports)
             overview = overview_data.get("overview", "")
-            highlights = overview_data.get("dominant_themes", [])
+            highlights = overview_data.get("dominant_themes", [h.get("text", "") for h in themes_with_links])
         else:
             overview = self._fallback_overview(weekly_reports)
-            highlights = self._extract_themes(weekly_reports)
+            highlights = [h.get("text", "") for h in themes_with_links]
         
-        content_blocks = self._build_content_blocks(weekly_reports, highlights)
+        # Use themes_with_links for content blocks (has page_link info)
+        content_blocks = self._build_content_blocks(weekly_reports, themes_with_links)
         
         return ReportData(
             period=period,
@@ -339,34 +343,64 @@ class MonthlyReportBuilder:
         count = len(weekly_reports)
         return f"本月共{count}周有内容记录。"
     
-    def _extract_themes(self, weekly_reports: List[Dict]) -> List[str]:
-        """Extract themes from weekly reports."""
+    def _extract_themes(self, weekly_reports: List[Dict]) -> List[Dict]:
+        """Extract themes from weekly reports with source info."""
         all_themes = []
         for report in weekly_reports:
             highlights = report.get("highlights") or []
-            all_themes.extend(highlights)
+            report_url = report.get("url", "")
+            report_title = report.get("title", "")
+            for h in highlights:
+                all_themes.append({
+                    "text": h,
+                    "page_link": report_url,
+                    "source": report_title,
+                })
         return all_themes[:5]
     
     def _build_content_blocks(
         self,
         weekly_reports: List[Dict],
-        highlights: List[str],
+        themes: List,  # Can be List[str] or List[Dict]
     ) -> List[Dict]:
         """Build Notion blocks for monthly report."""
         blocks: List[Dict] = []
         
-        # Weekly summary section
+        # Weekly reports section with clickable links and summaries
         blocks.append(_heading2(f"📆 本月概览 ({len(weekly_reports)}周)"))
         for report in weekly_reports:
             title = report.get("title", "")
-            blocks.append(_bullet(title))
+            summary = report.get("summary", "")[:200]  # ~200 chars
+            page_url = report.get("url", "")
+            
+            # Weekly report title as callout with link
+            blocks.append(_callout(title, "📅", page_url))
+            
+            # Summary paragraph
+            if summary:
+                blocks.append(_paragraph(f"  {summary}"))
+            
+            # Add spacing
+            blocks.append(_paragraph(""))
+        
         blocks.append(_divider())
         
-        # Themes section
-        if highlights:
+        # Themes section with page links
+        if themes:
             blocks.append(_heading2("🎯 本月主题"))
-            for h in highlights:
-                blocks.append(_bullet(h))
+            for t in themes:
+                if isinstance(t, dict):
+                    # New format with source info
+                    text = t.get("text", "")
+                    page_link = t.get("page_link", "")
+                    source = t.get("source", "")
+                    if page_link:
+                        blocks.append(_bullet_with_link(f"{text} ({source})", page_link))
+                    else:
+                        blocks.append(_bullet(text))
+                else:
+                    # Old format: just string
+                    blocks.append(_bullet(t))
             blocks.append(_divider())
         
         return blocks

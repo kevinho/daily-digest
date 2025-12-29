@@ -237,20 +237,46 @@ def generate_report(report_type: str, target_date: Optional[date] = None, force:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Personal Content Digest orchestrator")
+    parser = argparse.ArgumentParser(
+        description="Personal Content Digest orchestrator",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Commands:
+  process    Process new items from Inbox (preprocess + fetch + summarize)
+  report     Generate hierarchical reports (daily/weekly/monthly)
+
+Examples:
+  python main.py process                    # Process all pending items
+  python main.py process --preprocess-only  # Only preprocess (no fetch)
+  python main.py report --type daily        # Generate today's daily report
+  python main.py report --type weekly       # Generate this week's report
+        """
+    )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     
-    # Default run command (legacy behavior)
-    parser.add_argument("--digest", dest="digest_window", default=None, help="Trigger manual digest window (e.g., daily/weekly/monthly/custom)")
-    parser.add_argument(
-        "--preprocess",
+    # Process subcommand - for processing new items
+    process_parser = subparsers.add_parser(
+        "process",
+        help="Process new items from Inbox (preprocess + fetch + summarize)"
+    )
+    process_parser.add_argument(
+        "--preprocess-only",
         dest="preprocess_only",
         action="store_true",
-        help="Run fill-missing-fields preprocessing (backfill Name, enforce URL/Content) and exit",
+        help="Only run preprocessing (backfill Name, validate URL/Content), skip fetch and summarize",
+    )
+    process_parser.add_argument(
+        "--digest",
+        dest="digest_window",
+        default=None,
+        help="After processing, trigger manual digest (e.g., daily/weekly/monthly/custom)",
     )
     
-    # Report subcommand for hierarchical reporting system
-    report_parser = subparsers.add_parser("report", help="Generate hierarchical reports (daily/weekly/monthly)")
+    # Report subcommand - for hierarchical reporting system
+    report_parser = subparsers.add_parser(
+        "report",
+        help="Generate hierarchical reports (daily/weekly/monthly)"
+    )
     report_parser.add_argument(
         "--type",
         dest="report_type",
@@ -273,7 +299,9 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    if args.command == "report":
+    if args.command == "process":
+        main(digest_window=args.digest_window, preprocess_only=args.preprocess_only)
+    elif args.command == "report":
         page_id = generate_report(args.report_type, args.target_date, args.force)
         if page_id:
             print(f"Report created/found: {page_id}")
@@ -281,4 +309,5 @@ if __name__ == "__main__":
             print("Failed to generate report")
             exit(1)
     else:
-        main(digest_window=args.digest_window, preprocess_only=args.preprocess_only)
+        # No command specified, show help
+        parser.print_help()

@@ -2,6 +2,7 @@
 import pytest
 
 from src import preprocess
+from src.content_type import ContentType
 from src.routing import ItemType
 
 
@@ -17,7 +18,9 @@ class StubNotion:
         self.titles = {}
         self.errors = {}
         self.done = {}
+        self.unprocessed = {}
         self.item_types = {}  # Track ItemType assignments
+        self.content_types = {}  # Track ContentType assignments
         self.status = MockStatus()
         self._has_blocks = False  # Default: no content blocks
 
@@ -30,13 +33,31 @@ class StubNotion:
     def mark_as_done(self, page_id: str, summary: str, status: str = None) -> None:
         self.done[page_id] = {"summary": summary, "status": status}
 
+    def mark_unprocessed(self, page_id: str, reason: str) -> None:
+        self.unprocessed[page_id] = reason
+
     def set_item_type(self, page_id: str, item_type: str) -> None:
         """Track ItemType assignments."""
         self.item_types[page_id] = item_type
 
+    def set_content_type(self, page_id: str, content_type: str) -> None:
+        """Track ContentType assignments."""
+        self.content_types[page_id] = content_type
+
     def has_page_blocks(self, page_id: str) -> bool:
         """Return configurable result for content block check."""
         return self._has_blocks
+
+
+# Default mock for content type detection (always returns HTML)
+def _mock_detect_content_type_html(url, timeout=5.0):
+    return (ContentType.HTML, "mocked")
+
+
+@pytest.fixture(autouse=True)
+def mock_content_type_detection(monkeypatch):
+    """Default to HTML content type for all tests."""
+    monkeypatch.setattr(preprocess, "detect_content_type_sync", _mock_detect_content_type_html)
 
 
 # ============================================================
@@ -328,6 +349,49 @@ def test_empty_invalid_sets_item_type():
     preprocess.preprocess_item(page, notion, "cdp")
     
     assert notion.item_types.get("it3") == "empty_invalid"
+
+
+# ============================================================
+# ContentType Field Tests
+# ============================================================
+
+def test_url_resource_sets_content_type(monkeypatch):
+    """URL_RESOURCE should set ContentType field."""
+    notion = StubNotion()
+    monkeypatch.setattr(preprocess, "fetch_title_from_url", lambda url, cdp: "Title")
+    
+    page = {"id": "ct1", "title": "", "url": "http://example.com", "attachments": [], "raw_content": ""}
+    preprocess.preprocess_item(page, notion, "cdp")
+    
+    assert notion.content_types.get("ct1") == "html"
+
+
+def test_pdf_content_type_marks_unprocessed(monkeypatch):
+    """PDF ContentType should mark item as unprocessed."""
+    notion = StubNotion()
+    monkeypatch.setattr(preprocess, "detect_content_type_sync", lambda url, timeout=5.0: (ContentType.PDF, "Content-Type: application/pdf"))
+    
+    page = {"id": "ct2", "title": "", "url": "http://example.com/doc.pdf", "attachments": [], "raw_content": ""}
+    result = preprocess.preprocess_item(page, notion, "cdp")
+    
+    assert result["action"] == "unprocessed"
+    assert result["content_type"] == "pdf"
+    assert notion.content_types.get("ct2") == "pdf"
+    assert "ct2" in notion.unprocessed
+    assert "future" in notion.unprocessed["ct2"].lower()
+
+
+def test_image_content_type_marks_unprocessed(monkeypatch):
+    """IMAGE ContentType should mark item as unprocessed."""
+    notion = StubNotion()
+    monkeypatch.setattr(preprocess, "detect_content_type_sync", lambda url, timeout=5.0: (ContentType.IMAGE, "Content-Type: image/jpeg"))
+    
+    page = {"id": "ct3", "title": "", "url": "http://example.com/photo.jpg", "attachments": [], "raw_content": ""}
+    result = preprocess.preprocess_item(page, notion, "cdp")
+    
+    assert result["action"] == "unprocessed"
+    assert result["content_type"] == "image"
+    assert notion.content_types.get("ct3") == "image"
 
 
 # ============================================================

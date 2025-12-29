@@ -35,6 +35,7 @@ class PropertyNames:
     rule_version: str = "Rule Version"
     prompt_version: str = "Prompt Version"
     item_type: str = "ItemType"  # Select: url_resource, note_content, empty_invalid
+    content_type: str = "ContentType"  # Select: html, pdf, image, video, audio, json, text, binary, unknown
 
 
 class NotionManager:
@@ -71,6 +72,7 @@ class NotionManager:
             rule_version=get_env("NOTION_PROP_RULE_VERSION", PropertyNames.rule_version),
             prompt_version=get_env("NOTION_PROP_PROMPT_VERSION", PropertyNames.prompt_version),
             item_type=get_env("NOTION_PROP_ITEM_TYPE", PropertyNames.item_type),
+            content_type=get_env("NOTION_PROP_CONTENT_TYPE", PropertyNames.content_type),
         )
 
     def has_page_blocks(self, page_id: str) -> bool:
@@ -203,6 +205,14 @@ class NotionManager:
             if isinstance(select_val, dict):
                 item_type_value = select_val.get("name")
         
+        # Extract content_type
+        content_type_prop = props.get(self.prop.content_type, {})
+        content_type_value = None
+        if isinstance(content_type_prop, dict) and "select" in content_type_prop:
+            select_val = content_type_prop.get("select")
+            if isinstance(select_val, dict):
+                content_type_value = select_val.get("name")
+        
         # Generate page link
         page_id = page.get("id", "")
         page_link = f"https://notion.so/{page_id.replace('-', '')}" if page_id else ""
@@ -218,6 +228,7 @@ class NotionManager:
             "raw_content": raw_text,
             "source": source_value,
             "item_type": item_type_value,
+            "content_type": content_type_value,
             "page_link": page_link,
             "raw": page,
         }
@@ -589,6 +600,19 @@ class NotionManager:
         """
         props = {
             self.prop.item_type: {"select": {"name": item_type}},
+        }
+        self.client.pages.update(page_id=page_id, properties=props)
+
+    def set_content_type(self, page_id: str, content_type: str) -> None:
+        """
+        Set the ContentType select field.
+        
+        Args:
+            page_id: Notion page ID
+            content_type: One of 'html', 'pdf', 'image', 'video', 'audio', 'json', 'text', 'binary', 'unknown'
+        """
+        props = {
+            self.prop.content_type: {"select": {"name": content_type}},
         }
         self.client.pages.update(page_id=page_id, properties=props)
 

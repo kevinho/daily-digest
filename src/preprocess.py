@@ -2,7 +2,7 @@
 Preprocessing module for Notion items.
 
 Uses smart routing to classify items and apply appropriate processing:
-- URL_RESOURCE: Fetch title from URL, backfill if needed
+- URL_RESOURCE: Detect ContentType, fetch title from URL, backfill if needed
 - NOTE_CONTENT: Generate NOTE-YYYYMMDD-N name, mark ready
 - EMPTY_INVALID: Mark as Error
 """
@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 from src.browser import fetch_page_content, fetch_page_title
+from src.content_type import ContentType, detect_content_type_sync
 from src.routing import ItemType, classify_item
 from src.utils import generate_note_name
 
@@ -77,7 +78,7 @@ def _is_meaningful_name(name: str, url: Optional[str]) -> bool:
 
 
 def _process_url_resource(page: Dict[str, Any], notion: Any, cdp_url: str) -> Dict[str, Any]:
-    """Process URL_RESOURCE: backfill title from URL if needed, set ItemType."""
+    """Process URL_RESOURCE: detect ContentType, backfill title if needed, set ItemType."""
     page_id = page.get("id", "")
     name = (page.get("title") or "").strip()
     url = page.get("url")
@@ -87,11 +88,40 @@ def _process_url_resource(page: Dict[str, Any], notion: Any, cdp_url: str) -> Di
     # Always set ItemType
     notion.set_item_type(page_id, "url_resource")
 
+    # Detect ContentType from URL
+    content_type = ContentType.UNKNOWN
+    content_type_reason = ""
+    if url:
+        try:
+            content_type, content_type_reason = detect_content_type_sync(url)
+            logging.debug(f"ContentType detected for {url}: {content_type.value} ({content_type_reason})")
+        except Exception as e:
+            logging.warning(f"ContentType detection failed for {url}: {e}")
+            content_type = ContentType.UNKNOWN
+            content_type_reason = f"Detection error: {e}"
+    
+    # Always set ContentType in Notion
+    notion.set_content_type(page_id, content_type.value)
+
+    # Check if ContentType is processable
+    if not content_type.processable and content_type != ContentType.UNKNOWN:
+        # Non-processable content (PDF, IMAGE, VIDEO, AUDIO, BINARY)
+        reason = f"ContentType '{content_type.value}' not processable yet"
+        if content_type.future_support:
+            reason += " (future support planned)"
+        notion.mark_unprocessed(page_id, reason)
+        return {
+            "action": "unprocessed",
+            "reason": reason,
+            "item_type": "url_resource",
+            "content_type": content_type.value,
+        }
+
     has_name = _is_meaningful_name(name, url)
 
     if has_name:
         # Already has meaningful name, skip title backfill
-        return {"action": "skip", "item_type": "url_resource"}
+        return {"action": "skip", "item_type": "url_resource", "content_type": content_type.value}
 
     # Need to backfill title
     title = None
@@ -111,10 +141,10 @@ def _process_url_resource(page: Dict[str, Any], notion: Any, cdp_url: str) -> Di
 
     if title:
         notion.set_title(page_id, title, note="Backfilled Name from URL")
-        return {"action": "backfilled", "title": title, "item_type": "url_resource"}
+        return {"action": "backfilled", "title": title, "item_type": "url_resource", "content_type": content_type.value}
 
     notion.mark_as_error(page_id, "unable to backfill Name from URL")
-    return {"action": "error", "reason": "backfill failed", "item_type": "url_resource"}
+    return {"action": "error", "reason": "backfill failed", "item_type": "url_resource", "content_type": content_type.value}
 
 
 def _process_note_content(page: Dict[str, Any], notion: Any, sequence: int) -> Dict[str, Any]:
@@ -177,7 +207,7 @@ def preprocess_batch(pages: List[Dict[str, Any]], notion: Any, cdp_url: str) -> 
     
     Returns counters for each action type.
     """
-    counters = {"backfilled": 0, "error": 0, "skip": 0, "ready": 0}
+    counters = {"backfilled": 0, "error": 0, "skip": 0, "ready": 0, "unprocessed": 0}
     note_sequence = 1  # Track sequence for NOTE_CONTENT items today
     
     for page in pages:

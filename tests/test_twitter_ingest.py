@@ -4,6 +4,7 @@ import types
 import pytest
 
 import main
+from src.content_type import ContentType
 
 
 class StubNotion:
@@ -15,7 +16,10 @@ class StubNotion:
         self.duplicates = {}
         self.props = {}
         self.titles = {}
+        self.item_types = {}
+        self.content_types = {}
         self._find_return = None
+        self._has_blocks = False
 
         class Status:
             ready = "ready"
@@ -40,6 +44,15 @@ class StubNotion:
 
     def mark_as_error(self, page_id, error):
         self.errors[page_id] = error
+
+    def set_item_type(self, page_id: str, item_type: str) -> None:
+        self.item_types[page_id] = item_type
+
+    def set_content_type(self, page_id: str, content_type: str) -> None:
+        self.content_types[page_id] = content_type
+
+    def has_page_blocks(self, page_id: str) -> bool:
+        return self._has_blocks
 
     def set_classification(
         self,
@@ -204,11 +217,12 @@ def test_twitter_end_to_end_title_and_body(monkeypatch):
         "and a wonderful score from the maestro Dan Deacon - enjoy!"
     )
 
-    # Preprocess: mock title/text fetch
+    # Preprocess: mock title/text fetch and content type detection
     from src import preprocess
 
     monkeypatch.setattr(preprocess, "fetch_title_from_url", lambda url, cdp: expected_title)
     monkeypatch.setattr(preprocess, "fetch_text_from_url", lambda url, cdp: body)
+    monkeypatch.setattr(preprocess, "detect_content_type_sync", lambda url, timeout=5.0: (ContentType.HTML, "mocked"))
     res = preprocess.preprocess_item(page, notion, "cdp")
     assert res["action"] == "backfilled"
     assert notion.titles["7"]["title"] == expected_title
@@ -263,6 +277,7 @@ def test_twitter_end_to_end_title_and_body_deepseek(monkeypatch):
 
     monkeypatch.setattr(preprocess, "fetch_title_from_url", lambda url, cdp: expected_title)
     monkeypatch.setattr(preprocess, "fetch_text_from_url", lambda url, cdp: body)
+    monkeypatch.setattr(preprocess, "detect_content_type_sync", lambda url, timeout=5.0: (ContentType.HTML, "mocked"))
     page = {"id": "8", "title": "", "url": tweet_url, "attachments": [], "raw_content": ""}
     res = preprocess.preprocess_item(page, notion, "cdp")
     assert res["action"] == "backfilled"

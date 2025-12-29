@@ -9,6 +9,7 @@ from src.browser import fetch_page_content
 from src.llm import classify, generate_digest
 from src.notion import NotionManager
 from src.digest import build_digest
+from src.preprocess import preprocess_batch
 from src.utils import configure_logging, get_env, get_timezone
 
 
@@ -84,11 +85,25 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
     notion.mark_as_done(page_id, summary_text)
 
 
-def main(digest_window: Optional[str] = None) -> None:
+def run_preprocess(notion: NotionManager, cdp_url: str, scope: str) -> None:
+    items = notion.get_pending_tasks()
+    stats = preprocess_batch(items, notion, cdp_url)
+    logging.info("Preprocess scope=%s results: %s", scope, stats)
+
+
+def main(digest_window: Optional[str] = None, preprocess_only: bool = False) -> None:
     configure_logging()
     logging.info("Starting orchestrator")
     cdp_url = get_env("CHROME_REMOTE_URL", "http://localhost:9222")
     notion = NotionManager()
+    scope = get_env("PREPROCESS_SCOPE", "pending")
+    auto_preprocess = get_env("PREPROCESS_AUTO", "false").lower() in ("1", "true", "yes")
+
+    if auto_preprocess or preprocess_only:
+        run_preprocess(notion, cdp_url, scope)
+        if preprocess_only:
+            return
+
     pending = notion.get_pending_tasks()
     for item in pending:
         process_item(item, notion, cdp_url)
@@ -110,5 +125,11 @@ def main(digest_window: Optional[str] = None) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Personal Content Digest orchestrator")
     parser.add_argument("--digest", dest="digest_window", default=None, help="Trigger manual digest window (e.g., daily/weekly/monthly/custom)")
+    parser.add_argument(
+        "--preprocess",
+        dest="preprocess_only",
+        action="store_true",
+        help="Run fill-missing-fields preprocessing (backfill Name, enforce URL/Content) and exit",
+    )
     args = parser.parse_args()
-    main(digest_window=args.digest_window)
+    main(digest_window=args.digest_window, preprocess_only=args.preprocess_only)

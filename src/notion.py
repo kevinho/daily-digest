@@ -24,6 +24,7 @@ class PropertyNames:
     url: str = "URL"
     summary: str = "Summary"
     raw_content: str = "Raw Content"
+    reason: str = "Reason"  # optional audit/notes property if present
     confidence: str = "Confidence"
     sensitivity: str = "Sensitivity"
     files: str = "Files"
@@ -57,6 +58,7 @@ class NotionManager:
             url=get_env("NOTION_PROP_URL", PropertyNames.url),
             summary=get_env("NOTION_PROP_SUMMARY", PropertyNames.summary),
             raw_content=get_env("NOTION_PROP_RAW_CONTENT", PropertyNames.raw_content),
+            reason=get_env("NOTION_PROP_REASON", PropertyNames.reason),
             confidence=get_env("NOTION_PROP_CONFIDENCE", PropertyNames.confidence),
             sensitivity=get_env("NOTION_PROP_SENSITIVITY", PropertyNames.sensitivity),
             files=get_env("NOTION_PROP_FILES", PropertyNames.files),
@@ -97,6 +99,7 @@ class NotionManager:
         files_prop = props.get(self.prop.files, {})
         title_prop = props.get(self.prop.title, {})
         summary_prop = props.get(self.prop.summary, {})
+        raw_prop = props.get(self.prop.raw_content, {})
         attachments: List[str] = []
         if isinstance(files_prop, dict) and "files" in files_prop:
             for f in files_prop.get("files", []):
@@ -115,6 +118,11 @@ class NotionManager:
             sitems = summary_prop.get("rich_text", [])
             if sitems:
                 summary_text = sitems[0].get("plain_text", "") or sitems[0].get("text", {}).get("content", "")
+        raw_text = ""
+        if isinstance(raw_prop, dict):
+            ritems = raw_prop.get("rich_text", [])
+            if ritems:
+                raw_text = ritems[0].get("plain_text", "") or ritems[0].get("text", {}).get("content", "")
 
         tags_prop = props.get(self.prop.tags, {})
         tags: List[str] = []
@@ -133,9 +141,10 @@ class NotionManager:
             "url": url,
             "attachments": attachments,
             "status": status_name,
-             "title": title_text,
-             "summary": summary_text,
-             "tags": tags,
+            "title": title_text,
+            "summary": summary_text,
+            "tags": tags,
+            "raw_content": raw_text,
             "raw": page,
         }
 
@@ -187,6 +196,12 @@ class NotionManager:
 
     def _update_status(self, page_id: str, status: str, extra_props: Optional[Dict[str, Any]] = None) -> None:
         self._set_status(page_id, status, extra_props)
+
+    def _with_reason(self, note: Optional[str], props: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        merged: Dict[str, Any] = props.copy() if props else {}
+        if note:
+            merged[self.prop.reason] = {"rich_text": [{"text": {"content": note[:1900]}}]}
+        return merged
 
     def create_digest_page(
         self,
@@ -261,21 +276,30 @@ class NotionManager:
         self._update_status(page_id, target_status, props)
 
     def mark_as_error(self, page_id: str, error: str) -> None:
-        props = {
-            self.prop.summary: {"rich_text": [{"text": {"content": f"Error: {error}"[:1900]}}]},
-        }
+        props = self._with_reason(
+            error,
+            {
+                self.prop.summary: {"rich_text": [{"text": {"content": f"Error: {error}"[:1900]}}]},
+            },
+        )
         self._update_status(page_id, self.status.error, props)
 
     def mark_unprocessed(self, page_id: str, note: str) -> None:
-        props = {
-            self.prop.summary: {"rich_text": [{"text": {"content": note[:1900]}}]},
-        }
+        props = self._with_reason(
+            note,
+            {
+                self.prop.summary: {"rich_text": [{"text": {"content": note[:1900]}}]},
+            },
+        )
         self._update_status(page_id, self.status.unprocessed, props)
 
     def mark_excluded(self, page_id: str, note: str) -> None:
-        props = {
-            self.prop.summary: {"rich_text": [{"text": {"content": note[:1900]}}]},
-        }
+        props = self._with_reason(
+            note,
+            {
+                self.prop.summary: {"rich_text": [{"text": {"content": note[:1900]}}]},
+            },
+        )
         self._update_status(page_id, self.status.excluded, props)
 
     def fetch_ready_for_digest(
@@ -332,4 +356,11 @@ class NotionManager:
             props[self.prop.raw_content] = {"rich_text": [{"text": {"content": raw_content[:1900]}}]}
         if canonical_url:
             props[self.prop.canonical_url] = {"url": canonical_url}
+        self.client.pages.update(page_id=page_id, properties=props)
+
+    def set_title(self, page_id: str, title: str, note: Optional[str] = None) -> None:
+        props: Dict[str, Any] = {
+            self.prop.title: {"title": [{"text": {"content": title[:1900]}}]},
+        }
+        props = self._with_reason(note, props)
         self.client.pages.update(page_id=page_id, properties=props)

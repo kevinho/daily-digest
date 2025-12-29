@@ -13,9 +13,9 @@
 
 ## Phase 2: Foundational (Blocking)
 
-- [ ] T010 在 `src/browser.py` 增加反爬配置入口（AutomationControlled/UA/viewport/init_script 可配置），默认启用。
-- [ ] T011 在 `src/utils.py` 添加 tweet URL 校验/规范化工具，返回错误时供管线直接标记 Error。
-- [ ] T012 在 `src/browser.py` 增加阻断检测（登录墙/JS 提示），返回明确错误消息（供 Reason 使用），不返回错误正文。
+- [x] T010 在 `src/browser.py` 增加反爬配置入口（AutomationControlled/UA/viewport/init_script 可配置），默认启用。
+- [x] T011 在 `src/utils.py` 添加 tweet URL 校验/规范化工具，返回错误时供管线直接标记 Error。
+- [x] T012 在 `src/browser.py` 增加阻断检测（登录墙/JS 提示），返回明确错误消息（供 Reason 使用），不返回错误正文。
 
 **Checkpoint**: 反爬配置 & 阻断检测可复用，URL 校验可用。
 
@@ -23,9 +23,9 @@
 
 ## Phase 3: User Story 1 - 基础抓取（CDP 合法浏览器） 🎯
 
-- [ ] T020 [US1] 在 `src/browser.py` 实现 Twitter/X 抓取函数，使用反爬配置，返回正文/错误原因。
-- [ ] T021 [US1] 在 `main.py` 集成 Twitter 抓取路径：检测 tweet URL，调用抓取，写入 Raw Content/Reason/Status。
-- [ ] T022 [P] [US1] 在 `tests/test_twitter_ingest.py` 编写用例：成功抓取、阻断返回 Error、无效 URL 返回 Error。
+- [x] T020 [US1] 在 `src/browser.py` 实现 Twitter/X 抓取函数，使用反爬配置，返回正文/错误原因。
+- [x] T021 [US1] 在 `main.py` 集成 Twitter 抓取路径：检测 tweet URL，调用抓取，写入 Raw Content/Reason/Status。
+- [x] T022 [P] [US1] 在 `tests/test_twitter_ingest.py` 编写用例：成功抓取、阻断返回 Error、无效 URL 返回 Error。
 
 ---
 

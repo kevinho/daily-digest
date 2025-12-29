@@ -38,14 +38,16 @@ class ReportPeriod:
         
         Examples:
             - Daily: "Daily Digest - 2025-01-15"
-            - Weekly: "Weekly Digest - W03 2025"
+            - Weekly: "Weekly Digest - W03 2025 (12-29 ~ 01-04)"
             - Monthly: "Monthly Digest - January 2025"
         """
         if self.type == ReportType.DAILY:
             return f"Daily Digest - {self.start_date.isoformat()}"
         elif self.type == ReportType.WEEKLY:
             week_num = self.start_date.isocalendar()[1]
-            return f"Weekly Digest - W{week_num:02d} {self.start_date.year}"
+            start_str = self.start_date.strftime("%m-%d")
+            end_str = self.end_date.strftime("%m-%d")
+            return f"Weekly Digest - W{week_num:02d} {self.start_date.year} ({start_str} ~ {end_str})"
         else:  # MONTHLY
             return f"Monthly Digest - {self.start_date.strftime('%B %Y')}"
     
@@ -56,14 +58,16 @@ class ReportPeriod:
         
         Examples:
             - Daily: "日报 - 2025-01-15"
-            - Weekly: "周报 - 2025年第03周"
+            - Weekly: "周报 - 2025年第03周 (12-29 ~ 01-04)"
             - Monthly: "月报 - 2025年01月"
         """
         if self.type == ReportType.DAILY:
             return f"日报 - {self.start_date.isoformat()}"
         elif self.type == ReportType.WEEKLY:
             week_num = self.start_date.isocalendar()[1]
-            return f"周报 - {self.start_date.year}年第{week_num:02d}周"
+            start_str = self.start_date.strftime("%m-%d")
+            end_str = self.end_date.strftime("%m-%d")
+            return f"周报 - {self.start_date.year}年第{week_num:02d}周 ({start_str} ~ {end_str})"
         else:  # MONTHLY
             return f"月报 - {self.start_date.strftime('%Y年%m月')}"
 

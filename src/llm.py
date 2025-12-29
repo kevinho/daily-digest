@@ -64,10 +64,6 @@ def generate_digest(text: str) -> Dict[str, str]:
                 temperature=0.3,
             )
             content = resp.choices[0].message.content or ""
-            # Debug logging (stdout)
-            print("=== OpenAI digest raw response ===")
-            print(content)
-            print("=== End OpenAI response ===")
             # 简单切分：第一行 TLDR，其余为 insights
             lines = [ln.strip() for ln in content.splitlines() if ln.strip()]
             tldr = lines[0] if lines else content[:200]

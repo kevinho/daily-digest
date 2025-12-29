@@ -516,7 +516,7 @@ def _divider() -> Dict:
 
 def _clean_summary(summary: str) -> str:
     """
-    Clean summary text: remove TLDR/Insights labels and get first meaningful line.
+    Clean summary text: remove all labels and get clean content only.
     
     Input might be:
         "**TLDR:** Some text.\n**Insights:**\n1. Point one\n2. Point two"
@@ -528,19 +528,24 @@ def _clean_summary(summary: str) -> str:
     if not summary:
         return ""
     
-    # Remove common prefixes
     text = summary.strip()
     
-    # Remove **TLDR:** or TLDR: prefix (with or without bold markers)
-    text = re.sub(r'^\*{0,2}TLDR:?\*{0,2}\s*', '', text, flags=re.IGNORECASE)
+    # Remove all markdown bold markers
+    text = text.replace('**', '')
     
-    # Get first line only (before Insights or newline)
-    # Split by common delimiters: newline, **Insights, Insights:
-    parts = re.split(r'\n|\*{0,2}Insights:?\*{0,2}', text, maxsplit=1)
-    first_line = parts[0].strip() if parts else text
+    # Remove TLDR label (various formats)
+    text = re.sub(r'^TLDR:?\s*', '', text, flags=re.IGNORECASE)
+    
+    # Split at Insights or numbered list or newline
+    # Stop at: "Insights:", numbered items "1.", or newlines
+    parts = re.split(r'\n|Insights:?|\d+\.', text, maxsplit=1, flags=re.IGNORECASE)
+    first_part = parts[0].strip() if parts else text
+    
+    # Clean up any remaining artifacts
+    first_part = first_part.strip('.:;,\n ')
     
     # Truncate to reasonable length
-    return first_line[:100]
+    return first_part[:100] if first_part else ""
 
 
 def _callout(text: str, icon: str = "📌", url: str = None) -> Dict:

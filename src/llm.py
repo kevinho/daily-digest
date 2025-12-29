@@ -269,3 +269,275 @@ def summarize_sections(items: List[Dict[str, str]]) -> List[Dict[str, str]]:
             }
         )
     return sections
+
+
+# ============================================================
+# Digest Generation Functions for Reporting System
+# ============================================================
+
+def generate_daily_digest(items: List[Dict]) -> Dict[str, any]:
+    """
+    Generate a daily digest from inbox items.
+    
+    Args:
+        items: List of items with title, summary, tags
+        
+    Returns:
+        Dict with 'overview', 'highlights', 'categories'
+    """
+    if not items:
+        return {
+            "overview": "今日无新增内容。",
+            "highlights": [],
+            "categories": {},
+        }
+    
+    client = _get_openai_client()
+    if client:
+        try:
+            # Build content summary
+            content_lines = []
+            for item in items[:30]:  # Limit items
+                title = item.get("title", "无标题")
+                tags = item.get("tags", ["未分类"])
+                summary = (item.get("summary") or "")[:100]
+                content_lines.append(f"- [{', '.join(tags[:2])}] {title}: {summary}")
+            
+            content_summary = "\n".join(content_lines)
+            
+            prompt = f"""你是一个知识管理助手。请根据以下今日收集的{len(items)}条内容摘要，生成一份"今日知识地图"：
+
+{content_summary}
+
+请按以下JSON格式输出（不要添加```json标记）：
+{{
+    "overview": "今日知识收获总结（100-150字）",
+    "highlights": ["重点内容1", "重点内容2", "重点内容3"],
+    "hot_topics": ["热门话题1", "热门话题2"]
+}}"""
+
+            resp = client.chat.completions.create(
+                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=500,
+                temperature=0.3,
+            )
+            content = resp.choices[0].message.content or "{}"
+            # Clean up markdown formatting if present
+            content = content.strip()
+            if content.startswith("```"):
+                content = re.sub(r"^```\w*\n?", "", content)
+                content = re.sub(r"\n?```$", "", content)
+            
+            import json
+            result = json.loads(content)
+            return {
+                "overview": result.get("overview", ""),
+                "highlights": result.get("highlights", []),
+                "categories": {},
+            }
+        except Exception as e:
+            print(f"OpenAI error in generate_daily_digest: {e}")
+    
+    # Fallback
+    return _daily_digest_fallback(items)
+
+
+def _daily_digest_fallback(items: List[Dict]) -> Dict[str, any]:
+    """Fallback daily digest without AI."""
+    # Count tags
+    tag_counts: Dict[str, int] = {}
+    for item in items:
+        for tag in item.get("tags", ["未分类"]):
+            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+    
+    # Build overview
+    total = len(items)
+    top_tags = sorted(tag_counts.items(), key=lambda x: -x[1])[:5]
+    tag_str = "、".join(f"{t}（{c}条）" for t, c in top_tags)
+    overview = f"今日共收集{total}条内容，涵盖{tag_str}。"
+    
+    # Extract highlights (top 3-5 titles)
+    highlights = [item.get("title", "")[:30] for item in items[:5] if item.get("title")]
+    
+    return {
+        "overview": overview,
+        "highlights": highlights,
+        "categories": {},
+    }
+
+
+def generate_weekly_digest(daily_reports: List[Dict]) -> Dict[str, any]:
+    """
+    Generate a weekly digest from daily reports.
+    
+    Args:
+        daily_reports: List of daily report dicts with overview, highlights
+        
+    Returns:
+        Dict with 'overview', 'trends', 'emerging', 'fading'
+    """
+    if not daily_reports:
+        return {
+            "overview": "本周无日报记录。",
+            "trends": [],
+            "emerging": [],
+            "fading": [],
+        }
+    
+    client = _get_openai_client()
+    if client:
+        try:
+            # Build daily summaries
+            daily_lines = []
+            for report in daily_reports:
+                date_str = report.get("date", "")
+                overview = report.get("summary") or report.get("overview", "")
+                highlights = report.get("highlights", [])
+                highlights_str = "、".join(highlights[:3]) if highlights else ""
+                daily_lines.append(f"- {date_str}: {overview[:100]} 要点：{highlights_str}")
+            
+            daily_summary = "\n".join(daily_lines)
+            
+            prompt = f"""你是一个知识管理助手。请根据过去一周的{len(daily_reports)}天日报总结，生成周度知识报告：
+
+{daily_summary}
+
+请按以下JSON格式输出（不要添加```json标记）：
+{{
+    "overview": "本周知识趋势总结（150-200字）",
+    "trends": ["热门话题1", "热门话题2", "热门话题3"],
+    "emerging": ["新兴话题1"],
+    "fading": ["消失话题1"]
+}}"""
+
+            resp = client.chat.completions.create(
+                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=500,
+                temperature=0.3,
+            )
+            content = resp.choices[0].message.content or "{}"
+            content = content.strip()
+            if content.startswith("```"):
+                content = re.sub(r"^```\w*\n?", "", content)
+                content = re.sub(r"\n?```$", "", content)
+            
+            import json
+            result = json.loads(content)
+            return {
+                "overview": result.get("overview", ""),
+                "trends": result.get("trends", []),
+                "emerging": result.get("emerging", []),
+                "fading": result.get("fading", []),
+            }
+        except Exception as e:
+            print(f"OpenAI error in generate_weekly_digest: {e}")
+    
+    # Fallback
+    return _weekly_digest_fallback(daily_reports)
+
+
+def _weekly_digest_fallback(daily_reports: List[Dict]) -> Dict[str, any]:
+    """Fallback weekly digest without AI."""
+    count = len(daily_reports)
+    
+    # Aggregate all highlights
+    all_highlights = []
+    for report in daily_reports:
+        all_highlights.extend(report.get("highlights", []))
+    
+    overview = f"本周共{count}天有内容记录。"
+    
+    return {
+        "overview": overview,
+        "trends": all_highlights[:5],
+        "emerging": [],
+        "fading": [],
+    }
+
+
+def generate_monthly_digest(weekly_reports: List[Dict]) -> Dict[str, any]:
+    """
+    Generate a monthly digest from weekly reports.
+    
+    Args:
+        weekly_reports: List of weekly report dicts
+        
+    Returns:
+        Dict with 'overview', 'dominant_themes', 'evolution'
+    """
+    if not weekly_reports:
+        return {
+            "overview": "本月无周报记录。",
+            "dominant_themes": [],
+            "evolution": "",
+        }
+    
+    client = _get_openai_client()
+    if client:
+        try:
+            # Build weekly summaries
+            weekly_lines = []
+            for report in weekly_reports:
+                title = report.get("title", "")
+                overview = report.get("summary") or report.get("overview", "")
+                trends = report.get("highlights", [])
+                trends_str = "、".join(trends[:3]) if trends else ""
+                weekly_lines.append(f"- {title}: {overview[:100]} 趋势：{trends_str}")
+            
+            weekly_summary = "\n".join(weekly_lines)
+            
+            prompt = f"""你是一个知识管理助手。请根据本月的{len(weekly_reports)}个周报总结，生成月度知识回顾：
+
+{weekly_summary}
+
+请按以下JSON格式输出（不要添加```json标记）：
+{{
+    "overview": "本月知识获取高层次总结（200-250字）",
+    "dominant_themes": ["主导主题1", "主导主题2"],
+    "evolution": "话题演变描述（从月初到月末的变化）"
+}}"""
+
+            resp = client.chat.completions.create(
+                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=600,
+                temperature=0.3,
+            )
+            content = resp.choices[0].message.content or "{}"
+            content = content.strip()
+            if content.startswith("```"):
+                content = re.sub(r"^```\w*\n?", "", content)
+                content = re.sub(r"\n?```$", "", content)
+            
+            import json
+            result = json.loads(content)
+            return {
+                "overview": result.get("overview", ""),
+                "dominant_themes": result.get("dominant_themes", []),
+                "evolution": result.get("evolution", ""),
+            }
+        except Exception as e:
+            print(f"OpenAI error in generate_monthly_digest: {e}")
+    
+    # Fallback
+    return _monthly_digest_fallback(weekly_reports)
+
+
+def _monthly_digest_fallback(weekly_reports: List[Dict]) -> Dict[str, any]:
+    """Fallback monthly digest without AI."""
+    count = len(weekly_reports)
+    
+    # Aggregate themes
+    all_themes = []
+    for report in weekly_reports:
+        all_themes.extend(report.get("highlights", []))
+    
+    overview = f"本月共{count}周有内容记录。"
+    
+    return {
+        "overview": overview,
+        "dominant_themes": all_themes[:5],
+        "evolution": "",
+    }

@@ -2,7 +2,7 @@
 import argparse
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 
 try:
@@ -200,8 +200,47 @@ def main(digest_window: Optional[str] = None, preprocess_only: bool = False) -> 
     )
 
 
+def generate_report(report_type: str, target_date: Optional[date] = None, force: bool = False) -> Optional[str]:
+    """
+    Generate a hierarchical report (daily/weekly/monthly).
+    
+    Args:
+        report_type: One of "daily", "weekly", "monthly"
+        target_date: Target date (defaults to today)
+        force: Force regeneration even if report exists
+        
+    Returns:
+        Created/existing page ID, or None on failure
+    """
+    from src.reporting.service import DigestService
+    from src.reporting.notion_reporting import ReportingDBManager
+    
+    configure_logging()
+    logging.info(f"Generating {report_type} report for {target_date or 'today'}")
+    
+    inbox_manager = NotionManager()
+    reporting_manager = ReportingDBManager()
+    
+    service = DigestService(inbox_manager, reporting_manager)
+    
+    target = target_date or date.today()
+    
+    if report_type.lower() == "daily":
+        return service.generate_daily(target, force=force)
+    elif report_type.lower() == "weekly":
+        return service.generate_weekly(target, force=force)
+    elif report_type.lower() == "monthly":
+        return service.generate_monthly(target, force=force)
+    else:
+        logging.error(f"Unknown report type: {report_type}")
+        return None
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Personal Content Digest orchestrator")
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    
+    # Default run command (legacy behavior)
     parser.add_argument("--digest", dest="digest_window", default=None, help="Trigger manual digest window (e.g., daily/weekly/monthly/custom)")
     parser.add_argument(
         "--preprocess",
@@ -209,5 +248,37 @@ if __name__ == "__main__":
         action="store_true",
         help="Run fill-missing-fields preprocessing (backfill Name, enforce URL/Content) and exit",
     )
+    
+    # Report subcommand for hierarchical reporting system
+    report_parser = subparsers.add_parser("report", help="Generate hierarchical reports (daily/weekly/monthly)")
+    report_parser.add_argument(
+        "--type",
+        dest="report_type",
+        choices=["daily", "weekly", "monthly"],
+        required=True,
+        help="Type of report to generate",
+    )
+    report_parser.add_argument(
+        "--date",
+        dest="target_date",
+        type=lambda s: datetime.strptime(s, "%Y-%m-%d").date(),
+        default=None,
+        help="Target date in YYYY-MM-DD format (defaults to today)",
+    )
+    report_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force regeneration even if report already exists",
+    )
+    
     args = parser.parse_args()
-    main(digest_window=args.digest_window, preprocess_only=args.preprocess_only)
+    
+    if args.command == "report":
+        page_id = generate_report(args.report_type, args.target_date, args.force)
+        if page_id:
+            print(f"Report created/found: {page_id}")
+        else:
+            print("Failed to generate report")
+            exit(1)
+    else:
+        main(digest_window=args.digest_window, preprocess_only=args.preprocess_only)

@@ -549,6 +549,48 @@ class NotionManager:
         resp = self._query({"filter": {"and": filters}})
         return [self._simplify_page(p) for p in resp.get("results", [])]
 
+    def fetch_items_for_date(
+        self,
+        target_date,
+        status_filter: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch items created on a specific date.
+        
+        Args:
+            target_date: The target date (datetime.date object)
+            status_filter: Optional status to filter by (e.g., "ready")
+            
+        Returns:
+            List of simplified page dicts for items created on target_date
+        """
+        from datetime import datetime, timedelta
+        
+        # Convert date to datetime range for the full day
+        if hasattr(target_date, 'isoformat'):
+            date_str = target_date.isoformat()
+        else:
+            date_str = str(target_date)
+        
+        # Build date filter for created_time
+        filters: List[Dict[str, Any]] = [
+            {
+                "timestamp": "created_time",
+                "created_time": {"on_or_after": f"{date_str}T00:00:00"},
+            },
+            {
+                "timestamp": "created_time",
+                "created_time": {"on_or_before": f"{date_str}T23:59:59"},
+            },
+        ]
+        
+        # Optionally filter by status
+        if status_filter:
+            filters.append(self._status_filter(status_filter))
+        
+        resp = self._query({"filter": {"and": filters}})
+        return [self._simplify_page(p) for p in resp.get("results", [])]
+
     def set_duplicate_of(self, page_id: str, canonical_id: str, note: str) -> None:
         props = {
             self.prop.duplicate_of: {"relation": [{"id": canonical_id}]},

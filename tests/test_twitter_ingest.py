@@ -13,6 +13,7 @@ class StubNotion:
         self.done = {}
         self.duplicates = {}
         self.props = {}
+        self._find_return = None
 
         class Status:
             ready = "ready"
@@ -24,7 +25,7 @@ class StubNotion:
         self.status = Status()
 
     def find_by_canonical(self, canonical_url):
-        return None
+        return self._find_return
 
     def set_duplicate_of(self, page_id, canonical_id, note):
         self.duplicates[page_id] = canonical_id
@@ -113,4 +114,43 @@ def test_invalid_tweet_url(monkeypatch):
     page = {"id": "3", "url": "https://x.com/user/invalid", "attachments": []}
     main.process_item(page, notion, "http://localhost:9222")
     assert "invalid tweet url" in notion.errors["3"]
+
+
+def test_duplicate_ready_skips(monkeypatch):
+    notion = StubNotion()
+    notion._find_return = {"id": "ready1", "status": notion.status.ready}
+    page = {"id": "4", "url": "https://x.com/user/status/999", "attachments": []}
+    main.process_item(page, notion, "http://localhost:9222")
+    assert notion.duplicates["4"] == "ready1"
+    assert "4" not in notion.classifications
+
+
+def test_retry_after_block(monkeypatch):
+    notion = StubNotion()
+
+    async def blocked(url, cdp_url):
+        raise RuntimeError("blocked: wall")
+
+    async def ok(url, cdp_url):
+        return "hi"
+
+    monkeypatch.setattr("main.fetch_page_content", blocked)
+    page = {"id": "5", "url": "https://x.com/user/status/100", "attachments": []}
+    main.process_item(page, notion, "http://localhost:9222")
+    assert "blocked" in notion.errors["5"]
+
+    monkeypatch.setattr("main.fetch_page_content", ok)
+    monkeypatch.setattr(
+        "main.classify",
+        lambda text: {
+            "tags": ["twitter"],
+            "sensitivity": "public",
+            "confidence": 0.8,
+            "rule_version": "r",
+            "prompt_version": "p",
+        },
+    )
+    monkeypatch.setattr("main.generate_digest", lambda text: {"tldr": "ok", "insights": ""})
+    main.process_item(page, notion, "http://localhost:9222")
+    assert notion.classifications["5"]["raw_content"] == "hi"
 

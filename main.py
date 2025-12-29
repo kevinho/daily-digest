@@ -39,6 +39,9 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
     canonical = canonical_url(target_url)
     existing = notion.find_by_canonical(canonical)
     if existing and existing.get("id") != page_id:
+        if existing.get("status") in (notion.status.ready, notion.status.pending):
+            notion.set_duplicate_of(page_id, existing["id"], f"Duplicate of ready/pending {existing['id']}")
+            return
         notion.set_duplicate_of(page_id, existing["id"], f"Duplicate of {existing['id']}")
         return
 

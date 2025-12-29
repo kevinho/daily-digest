@@ -1,5 +1,6 @@
 import asyncio
-from typing import Callable, Dict, Optional, TypeVar
+from enum import Enum
+from typing import Callable, Dict, Optional, Tuple, TypeVar
 from urllib.parse import urlparse
 
 try:
@@ -25,6 +26,39 @@ except ImportError:
 
 
 from src.utils import get_antibot_settings, get_int
+
+
+# ================================================================
+# Twitter Smart Wait - Result Types and Exceptions
+# ================================================================
+
+class TwitterWaitResult(Enum):
+    """Result types for Twitter smart wait operation."""
+    SUCCESS = "success"
+    LOGIN_WALL = "login_wall"
+    SERVER_ERROR = "server_error"
+    TIMEOUT = "timeout"
+
+
+class TwitterFetchError(Exception):
+    """Base error for Twitter fetching."""
+    pass
+
+
+class TwitterLoginWallError(TwitterFetchError):
+    """Twitter login wall detected."""
+    pass
+
+
+class TwitterServerError(TwitterFetchError):
+    """Twitter server error detected."""
+    pass
+
+
+# Twitter element selectors
+TWITTER_CONTENT_SELECTOR = 'div[data-testid="tweetText"], article[data-testid="tweet"]'
+TWITTER_LOGIN_SELECTOR = '[data-testid="login"]'
+TWITTER_ERROR_SELECTOR = 'span:has-text("Something went wrong")'
 
 _PAGE_CACHE: Dict[str, Dict[str, str]] = {}
 
@@ -155,8 +189,90 @@ async def _extract_text_by_host(page, html: str, url: str) -> Optional[str]:
 
 
 def _get_twitter_wait_ms() -> int:
-    """Get Twitter-specific wait time from env, default 10000ms."""
-    return get_int("TWITTER_WAIT_MS", 10000)
+    """
+    Get Twitter-specific wait time from env, default 10000ms.
+    
+    DEPRECATED: Use _twitter_smart_wait() instead for deterministic waiting.
+    This function is kept for backward compatibility but returns 0 when
+    smart wait is enabled.
+    """
+    return 0  # Smart wait handles timing now
+
+
+async def _twitter_smart_wait(
+    page,
+    content_timeout_ms: int = 15000,
+    login_timeout_ms: int = 2000,
+    error_timeout_ms: int = 3000,
+) -> Tuple[TwitterWaitResult, str]:
+    """
+    Smart wait for Twitter content with fast failure detection.
+    
+    Uses parallel waiting to detect:
+    - Tweet content (success case)
+    - Login wall (fast failure)
+    - Server error (fast failure)
+    
+    Args:
+        page: Playwright page object
+        content_timeout_ms: Max wait for content (default 15s)
+        login_timeout_ms: Max wait for login wall detection (default 2s)
+        error_timeout_ms: Max wait for error detection (default 3s)
+        
+    Returns:
+        Tuple of (TwitterWaitResult, message)
+    """
+    try:
+        # Create tasks for parallel detection
+        content_task = asyncio.create_task(
+            page.wait_for_selector(TWITTER_CONTENT_SELECTOR, timeout=content_timeout_ms)
+        )
+        login_task = asyncio.create_task(
+            page.wait_for_selector(TWITTER_LOGIN_SELECTOR, timeout=login_timeout_ms)
+        )
+        error_task = asyncio.create_task(
+            page.wait_for_selector(TWITTER_ERROR_SELECTOR, timeout=error_timeout_ms)
+        )
+        
+        # Wait for first to complete (success or fast failure)
+        done, pending = await asyncio.wait(
+            [content_task, login_task, error_task],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        
+        # Cancel pending tasks to avoid warnings
+        for task in pending:
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+        
+        # Check which task completed first
+        completed_task = done.pop()
+        try:
+            result = completed_task.result()
+            # Task completed successfully (found element)
+            if completed_task is content_task:
+                return (TwitterWaitResult.SUCCESS, "Content loaded")
+            elif completed_task is login_task:
+                return (TwitterWaitResult.LOGIN_WALL, "Login Wall Detected")
+            elif completed_task is error_task:
+                return (TwitterWaitResult.SERVER_ERROR, "Twitter Server Error: Something went wrong")
+        except Exception:
+            # Task raised exception (timeout or other)
+            pass
+        
+        # If we get here, first completed task had an error
+        # Wait a bit more for content as fallback
+        try:
+            await page.wait_for_selector(TWITTER_CONTENT_SELECTOR, timeout=5000)
+            return (TwitterWaitResult.SUCCESS, "Content loaded (delayed)")
+        except Exception:
+            return (TwitterWaitResult.TIMEOUT, "Content Not Found (timeout)")
+            
+    except Exception as e:
+        return (TwitterWaitResult.TIMEOUT, f"Smart wait failed: {e}")
 
 
 def _cache_get(url: str, key: str) -> Optional[str]:
@@ -175,10 +291,15 @@ def _cache_set(url: str, key: str, value: Optional[str]) -> None:
 
 
 def _wait_delay_ms(url: str) -> int:
-    """Return extra wait (ms) after navigation for dynamic pages."""
+    """
+    Return extra wait (ms) after navigation for dynamic pages.
+    
+    For Twitter: returns 0 because _twitter_smart_wait() handles timing.
+    For other sites: returns 1500ms default delay.
+    """
     host = (url or "").lower()
     if "x.com" in host or "twitter.com" in host:
-        return _get_twitter_wait_ms()
+        return 0  # Smart wait handles Twitter timing
     return 1500
 
 
@@ -388,15 +509,24 @@ async def fetch_page_content(
                 await context.add_init_script(opts["init_script"])
             try:
                 await page.goto(url, wait_until="load", timeout=timeout_ms)
-                await page.wait_for_timeout(_wait_delay_ms(url))
-                html = await page.content()
                 
                 # Host-specific extractor (e.g., Twitter) with hybrid strategy
                 host = _host(url).lower()
                 is_twitter = "x.com" in host or "twitter.com" in host
                 
                 if is_twitter:
-                    # For Twitter: try Meta extraction FIRST (instant, no JS needed)
+                    # Smart wait for Twitter content with fast failure detection
+                    wait_result, wait_message = await _twitter_smart_wait(page)
+                    
+                    if wait_result == TwitterWaitResult.LOGIN_WALL:
+                        raise TwitterLoginWallError(wait_message)
+                    elif wait_result == TwitterWaitResult.SERVER_ERROR:
+                        raise TwitterServerError(wait_message)
+                    # For SUCCESS or TIMEOUT, continue to try meta extraction
+                    
+                    html = await page.content()
+                    
+                    # Try Meta extraction (works even after timeout as fallback)
                     hybrid = await _extract_twitter_hybrid(page, html)
                     if hybrid.get("text"):
                         _cache_set(url, "text", hybrid["text"])
@@ -404,11 +534,20 @@ async def fetch_page_content(
                         _cache_set(url, "title", hybrid["title"])
                     if hybrid.get("text"):
                         return hybrid["text"]
+                    
+                    # If smart wait timed out and no meta content, report error
+                    if wait_result == TwitterWaitResult.TIMEOUT:
+                        raise RuntimeError(f"Twitter content not found: {wait_message}")
+                    
                     # Only check block markers if Meta extraction failed
                     if any(marker in html.lower() for marker in BLOCK_MARKERS):
                         raise RuntimeError("blocked: login/JS wall detected (no Meta content)")
                 else:
-                    # For non-Twitter: check block markers first
+                    # For non-Twitter: use simple delay then extract
+                    await page.wait_for_timeout(_wait_delay_ms(url))
+                    html = await page.content()
+                    
+                    # Check block markers first
                     if any(marker in html.lower() for marker in BLOCK_MARKERS):
                         raise RuntimeError("blocked: login/JS wall detected")
                     host_text = await _extract_text_by_host(page, html, url)

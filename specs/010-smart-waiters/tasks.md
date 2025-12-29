@@ -81,15 +81,15 @@
 
 | Task | Status | Notes |
 |------|--------|-------|
-| T001 | ⬜ | |
-| T002 | ⬜ | |
-| T003 | ⬜ | |
-| T004 | ⬜ | |
-| T005 | ⬜ | |
-| T006 | ⬜ | |
-| T007 | ⬜ | |
-| T008 | ⬜ | |
-| T009 | ⬜ | |
-| T010 | ⬜ | |
-| T011 | ⬜ | |
+| T001 | ✅ | TwitterWaitResult enum |
+| T002 | ✅ | _twitter_smart_wait() |
+| T003 | ✅ | fetch_page_content() updated |
+| T004 | ✅ | TwitterLoginWallError |
+| T005 | ✅ | Login selector in smart wait |
+| T006 | ✅ | TwitterServerError |
+| T007 | ✅ | Error selector in smart wait |
+| T008 | ✅ | Timeout fallback to meta |
+| T009 | ✅ | Clear timeout messages |
+| T010 | ✅ | _wait_delay_ms() returns 0 |
+| T011 | ✅ | _get_twitter_wait_ms() deprecated |
 

@@ -310,52 +310,6 @@ def _page_options(override: Optional[Dict] = None) -> Dict:
     return base
 
 
-import logging
-import os
-
-_screenshot_logger = logging.getLogger(__name__)
-
-
-async def capture_tweet_screenshot(
-    page,
-    tweet_id: str,
-    output_dir: str = "tmp"
-) -> Optional[str]:
-    """
-    Capture screenshot of tweet element.
-    
-    Args:
-        page: Playwright page object (already navigated to tweet URL)
-        tweet_id: Tweet ID for filename
-        output_dir: Directory to save screenshot
-        
-    Returns:
-        Screenshot file path on success, None on failure
-    """
-    try:
-        # Ensure output directory exists
-        os.makedirs(output_dir, exist_ok=True)
-        
-        path = f"{output_dir}/tweet-{tweet_id}.png"
-        
-        # Try to locate the main tweet element
-        tweet_el = page.locator('article[data-testid="tweet"]').first
-        if await tweet_el.count() > 0:
-            # Screenshot just the tweet element
-            await tweet_el.screenshot(path=path)
-            _screenshot_logger.info(f"Captured tweet element screenshot: {path}")
-            return path
-        
-        # Fallback: screenshot visible viewport
-        await page.screenshot(path=path, full_page=False)
-        _screenshot_logger.info(f"Captured viewport screenshot (no tweet element): {path}")
-        return path
-        
-    except Exception as e:
-        _screenshot_logger.warning(f"Screenshot failed for tweet {tweet_id}: {e}")
-        return None
-
-
 def extract_tweet_id_from_url(url: str) -> Optional[str]:
     """Extract tweet ID from Twitter/X URL."""
     if not url:
@@ -373,66 +327,6 @@ def extract_tweet_id_from_url(url: str) -> Optional[str]:
         if cleaned.isdigit():
             return cleaned
     return None
-
-
-async def capture_tweet_screenshot_standalone(
-    url: str,
-    cdp_url: str = "http://localhost:9222",
-    output_dir: str = "tmp",
-    timeout_ms: int = 15000,
-) -> Optional[str]:
-    """
-    Capture screenshot of a tweet page (standalone function).
-    
-    Opens a new page, navigates to the URL, captures screenshot, and closes.
-    Uses the cached page if available from previous fetch.
-    
-    Args:
-        url: Tweet URL
-        cdp_url: Chrome DevTools Protocol URL
-        output_dir: Directory to save screenshot
-        timeout_ms: Navigation timeout
-        
-    Returns:
-        Screenshot file path on success, None on failure
-    """
-    tweet_id = extract_tweet_id_from_url(url)
-    if not tweet_id:
-        _screenshot_logger.warning(f"Could not extract tweet ID from URL: {url}")
-        return None
-    
-    try:
-        from playwright.async_api import async_playwright
-    except ImportError:
-        _screenshot_logger.warning("Playwright not installed, skipping screenshot")
-        return None
-    
-    try:
-        async with async_playwright() as p:
-            browser = await p.chromium.connect_over_cdp(cdp_url)
-            contexts = browser.contexts
-            if contexts:
-                context = contexts[0]
-            else:
-                opts = _page_options()
-                context = await browser.new_context(
-                    user_agent=opts.get("user_agent"),
-                    viewport=opts.get("viewport"),
-                )
-            
-            page = await context.new_page()
-            try:
-                await page.goto(url, wait_until="load", timeout=timeout_ms)
-                await page.wait_for_timeout(_wait_delay_ms(url))
-                
-                # Capture screenshot
-                return await capture_tweet_screenshot(page, tweet_id, output_dir)
-            finally:
-                await page.close()
-                
-    except Exception as e:
-        _screenshot_logger.warning(f"Screenshot standalone failed for {url}: {e}")
-        return None
 
 
 BLOCK_MARKERS = [

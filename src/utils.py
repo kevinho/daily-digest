@@ -64,11 +64,6 @@ def _parse_viewport(val: Optional[str]) -> Optional[dict]:
         return None
 
 
-def get_screenshot_enabled() -> bool:
-    """Check if Twitter screenshot feature is enabled."""
-    return _parse_bool(os.getenv("TWITTER_SCREENSHOT_ENABLE"), True)
-
-
 def get_antibot_settings() -> dict:
     """Load anti-bot/UA/viewport settings from env."""
     ua_default = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"

@@ -10,12 +10,12 @@ try:
 except Exception:  # pragma: no cover
     RetryError = Exception
 
-from src.browser import fetch_page_content, capture_tweet_screenshot_standalone, extract_tweet_id_from_url
+from src.browser import fetch_page_content
 from src.llm import classify, generate_digest
 from src.notion import NotionManager
 from src.digest import build_digest
 from src.preprocess import preprocess_batch
-from src.utils import configure_logging, get_env, get_timezone, normalize_tweet_url, get_screenshot_enabled
+from src.utils import configure_logging, get_env, get_timezone, normalize_tweet_url
 from urllib.parse import urlparse
 import os
 
@@ -99,22 +99,6 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> str:
     if not text:
         notion.mark_as_error(page_id, "no content")
         return "error"
-
-    # Capture screenshot for Twitter URLs (non-blocking)
-    # NOTE: Screenshots are saved locally. Notion Files field requires HTTP/HTTPS URLs.
-    # To display in Notion, upload to cloud storage (S3/R2) and use public URL.
-    is_twitter = "twitter.com" in url.lower() or "x.com" in url.lower()
-    screenshot_path = None
-    if is_twitter and get_screenshot_enabled():
-        try:
-            screenshot_path = asyncio.run(capture_tweet_screenshot_standalone(target_url, cdp_url))
-            if screenshot_path:
-                logging.info(f"Tweet screenshot saved: {screenshot_path}")
-                # TODO: Upload to cloud storage and call notion.add_file_to_item(page_id, public_url)
-                # For now, keep screenshot file locally for manual reference
-        except Exception as e:
-            # Screenshot failure is non-critical
-            logging.warning(f"Screenshot capture failed for {url}: {e}")
 
     # Classification
     classification = classify(text)

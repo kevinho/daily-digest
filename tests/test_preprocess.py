@@ -64,3 +64,21 @@ def test_batch_counts(monkeypatch):
     assert stats["error"] == 1
     assert stats["skip"] == 1
 
+
+def test_domain_placeholder_backfills_with_bookmark(monkeypatch):
+    notion = StubNotion()
+    # Simulate fetch failure to force domain fallback
+    monkeypatch.setattr(preprocess, "fetch_text_from_url", lambda url, cdp: "")
+    page = {"id": "d", "title": "https://example.com", "url": "https://example.com/post", "attachments": [], "raw_content": ""}
+    result = preprocess.preprocess_item(page, notion, "cdp")
+    assert result["action"] == "backfilled"
+    assert notion.titles["d"]["title"].startswith("Bookmark:example.com")
+
+
+def test_image_clip_name_when_only_attachment():
+    notion = StubNotion()
+    page = {"id": "e", "title": "", "url": None, "attachments": ["https://files/notion/image.png"], "raw_content": ""}
+    result = preprocess.preprocess_item(page, notion, "cdp")
+    assert result["action"] == "backfilled"
+    assert notion.titles["e"]["title"] in ["image.png", "Image Clip"]
+

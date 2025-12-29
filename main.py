@@ -111,12 +111,11 @@ def main(digest_window: Optional[str] = None, preprocess_only: bool = False) -> 
     cdp_url = get_env("CHROME_REMOTE_URL", "http://localhost:9222")
     notion = NotionManager()
     scope = get_env("PREPROCESS_SCOPE", "pending")
-    auto_preprocess = get_env("PREPROCESS_AUTO", "false").lower() in ("1", "true", "yes")
 
-    if auto_preprocess or preprocess_only:
-        run_preprocess(notion, cdp_url, scope)
-        if preprocess_only:
-            return
+    # 预处理必跑：先做字段补齐/校验，再进入抓取与摘要阶段
+    run_preprocess(notion, cdp_url, scope)
+    if preprocess_only:
+        return
 
     pending = notion.get_pending_tasks()
     counts = {"success": 0, "error": 0, "duplicate": 0, "unprocessed": 0}
@@ -138,6 +137,13 @@ def main(digest_window: Optional[str] = None, preprocess_only: bool = False) -> 
         else:
             logging.warning("NOTION_DIGEST_PARENT_ID not set; digest page not created")
     logging.info("Ingest results: %s", counts)
+    logging.info(
+        "METRIC ingest_counts success=%d error=%d duplicate=%d unprocessed=%d",
+        counts["success"],
+        counts["error"],
+        counts["duplicate"],
+        counts["unprocessed"],
+    )
 
 
 if __name__ == "__main__":

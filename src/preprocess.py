@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 from src.browser import fetch_page_content
 
@@ -27,6 +28,31 @@ def fetch_text_from_url(url: str, cdp_url: str) -> Optional[str]:
         return None
 
 
+def _domain_from_url(url: Optional[str]) -> Optional[str]:
+    if not url:
+        return None
+    try:
+        parsed = urlparse(url)
+        return parsed.hostname
+    except Exception:
+        return None
+
+
+def _is_meaningful_name(name: str, url: Optional[str]) -> bool:
+    """Treat empty/placeholder/domain-like names as missing."""
+    cleaned = (name or "").strip()
+    if not cleaned:
+        return False
+    lowered = cleaned.lower()
+    if lowered in {"untitled", "new page", "bookmark", "default"}:
+        return False
+    # names that are just the domain or url are not meaningful
+    domain = _domain_from_url(url)
+    if domain and (cleaned == domain or cleaned.startswith("http")):
+        return False
+    return True
+
+
 def preprocess_item(page: Dict[str, Any], notion: Any, cdp_url: str) -> Dict[str, Any]:
     """Enforce mandatory fields and backfill Name when possible."""
     page_id = page.get("id", "")
@@ -35,7 +61,7 @@ def preprocess_item(page: Dict[str, Any], notion: Any, cdp_url: str) -> Dict[str
     raw_content = (page.get("raw_content") or "").strip()
     attachments: List[str] = page.get("attachments") or []
 
-    has_name = bool(name)
+    has_name = _is_meaningful_name(name, url)
     has_url = bool(url)
     has_content = bool(raw_content or attachments)
 
@@ -56,6 +82,12 @@ def preprocess_item(page: Dict[str, Any], notion: Any, cdp_url: str) -> Dict[str
             title = derive_title_from_content(raw_content)
         if not title and attachments:
             title = attachments[0].split("/")[-1][:140]
+        if not title and has_url:
+            domain = _domain_from_url(url)
+            if domain:
+                title = f"Bookmark:{domain}"[:140]
+        if not title and not has_url and attachments:
+            title = "Image Clip"
 
         if title:
             notion.set_title(page_id, title, note="Backfilled Name during preprocessing")

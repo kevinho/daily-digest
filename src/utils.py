@@ -5,7 +5,11 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# Gracefully ignore missing/permission-denied .env during tests
+try:
+    load_dotenv()
+except PermissionError:
+    pass
 
 
 def get_env(key: str, default: Optional[str] = None, required: bool = False) -> str:

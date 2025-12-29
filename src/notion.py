@@ -393,3 +393,69 @@ class NotionManager:
         }
         props = self._with_reason(note, props)
         self.client.pages.update(page_id=page_id, properties=props)
+
+    def add_file_to_item(
+        self,
+        page_id: str,
+        file_path: str,
+        file_name: Optional[str] = None,
+    ) -> bool:
+        """
+        Add a file reference to the Files property.
+        
+        Note: Notion API doesn't support direct file upload. This method adds
+        the file as an external URL reference using file:// protocol for local files.
+        For true cloud storage, you'd need to upload to S3/R2 first.
+        
+        Args:
+            page_id: Notion page ID
+            file_path: Local file path (absolute or relative)
+            file_name: Display name for the file (defaults to basename)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        import os
+        
+        if not file_path or not os.path.exists(file_path):
+            return False
+        
+        # Convert to absolute path
+        abs_path = os.path.abspath(file_path)
+        
+        # Use file:// protocol for local files
+        file_url = f"file://{abs_path}"
+        
+        # Get display name
+        display_name = file_name or os.path.basename(file_path)
+        
+        try:
+            # First, get existing files to preserve them
+            page = self.client.pages.retrieve(page_id)
+            existing_files = []
+            files_prop = page.get("properties", {}).get(self.prop.files, {})
+            if isinstance(files_prop, dict) and "files" in files_prop:
+                for f in files_prop.get("files", []):
+                    # Preserve existing file references
+                    existing_files.append(f)
+            
+            # Add new file as external reference
+            new_file = {
+                "type": "external",
+                "name": display_name,
+                "external": {"url": file_url}
+            }
+            existing_files.append(new_file)
+            
+            # Update the Files property
+            props = {
+                self.prop.files: {"files": existing_files}
+            }
+            self.client.pages.update(page_id=page_id, properties=props)
+            return True
+            
+        except Exception as e:
+            # Log the error but don't raise - screenshot is non-critical
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to add file to Notion: {e}")
+            return False

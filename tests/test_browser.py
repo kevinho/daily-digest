@@ -1,5 +1,12 @@
 import pytest
-from src.browser import _extract_twitter_meta, _host, _cache_get, _cache_set, _PAGE_CACHE
+from src.browser import (
+    _extract_twitter_meta,
+    _host,
+    _cache_get,
+    _cache_set,
+    _PAGE_CACHE,
+    extract_tweet_id_from_url,
+)
 
 
 class TestExtractTwitterMeta:
@@ -113,6 +120,45 @@ class TestPageCache:
     def test_cache_set_none_value_ignored(self):
         _cache_set("https://test.com", "title", None)
         assert _cache_get("https://test.com", "title") is None
+
+
+class TestExtractTweetId:
+    """Test extract_tweet_id_from_url function."""
+
+    def test_standard_tweet_url(self):
+        """Should extract ID from standard tweet URL."""
+        url = "https://x.com/user/status/123456789"
+        assert extract_tweet_id_from_url(url) == "123456789"
+
+    def test_twitter_com_url(self):
+        """Should extract ID from twitter.com URL."""
+        url = "https://twitter.com/user/status/987654321"
+        assert extract_tweet_id_from_url(url) == "987654321"
+
+    def test_url_with_query_params(self):
+        """Should extract ID from URL with query parameters."""
+        url = "https://x.com/user/status/123456789?s=20&t=abc"
+        assert extract_tweet_id_from_url(url) == "123456789"
+
+    def test_mobile_url(self):
+        """Should extract ID from mobile URL format."""
+        url = "https://x.com/i/web/status/123456789"
+        assert extract_tweet_id_from_url(url) == "123456789"
+
+    def test_empty_url(self):
+        """Should return None for empty URL."""
+        assert extract_tweet_id_from_url("") is None
+        assert extract_tweet_id_from_url(None) is None
+
+    def test_non_tweet_url(self):
+        """Should return None for non-tweet URLs."""
+        assert extract_tweet_id_from_url("https://example.com") is None
+        assert extract_tweet_id_from_url("https://x.com/user") is None
+
+    def test_url_with_long_id(self):
+        """Should handle long tweet IDs."""
+        url = "https://x.com/user/status/2005358760047562802"
+        assert extract_tweet_id_from_url(url) == "2005358760047562802"
 
 
 @pytest.mark.asyncio

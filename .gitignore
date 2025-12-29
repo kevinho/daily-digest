@@ -28,3 +28,6 @@ logs/
 # Playwright
 .playwright/
 
+# Temporary files
+tmp/
+

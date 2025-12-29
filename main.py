@@ -10,13 +10,14 @@ try:
 except Exception:  # pragma: no cover
     RetryError = Exception
 
-from src.browser import fetch_page_content
+from src.browser import fetch_page_content, capture_tweet_screenshot_standalone, extract_tweet_id_from_url
 from src.llm import classify, generate_digest
 from src.notion import NotionManager
 from src.digest import build_digest
 from src.preprocess import preprocess_batch
-from src.utils import configure_logging, get_env, get_timezone, normalize_tweet_url
+from src.utils import configure_logging, get_env, get_timezone, normalize_tweet_url, get_screenshot_enabled
 from urllib.parse import urlparse
+import os
 
 
 def is_attachment_unprocessed(url: str) -> bool:
@@ -98,6 +99,26 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> str:
     if not text:
         notion.mark_as_error(page_id, "no content")
         return "error"
+
+    # Capture screenshot for Twitter URLs (non-blocking)
+    is_twitter = "twitter.com" in url.lower() or "x.com" in url.lower()
+    screenshot_path = None
+    if is_twitter and get_screenshot_enabled():
+        try:
+            screenshot_path = asyncio.run(capture_tweet_screenshot_standalone(target_url, cdp_url))
+            if screenshot_path:
+                # Upload to Notion Files field
+                upload_success = notion.add_file_to_item(page_id, screenshot_path)
+                if upload_success:
+                    logging.info(f"Screenshot uploaded for {page_id}: {screenshot_path}")
+                # Clean up temp file
+                try:
+                    os.remove(screenshot_path)
+                except Exception:
+                    pass
+        except Exception as e:
+            # Screenshot failure is non-critical
+            logging.warning(f"Screenshot capture failed for {url}: {e}")
 
     # Classification
     classification = classify(text)

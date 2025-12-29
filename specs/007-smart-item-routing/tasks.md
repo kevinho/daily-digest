@@ -9,9 +9,9 @@
 
 ### Tasks
 
-- [ ] **T001**: 创建 `src/routing.py`，定义 ItemType 枚举（URL_RESOURCE, NOTE_CONTENT, EMPTY_INVALID）
-- [ ] **T002**: 实现 `classify_item(item_data, notion)` 函数，URL 非空返回 URL_RESOURCE
-- [ ] **T003**: 修改 `preprocess.py`，集成 classify_item，URL_RESOURCE 走现有抓取流程
+- [x] **T001**: 创建 `src/routing.py`，定义 ItemType 枚举（URL_RESOURCE, NOTE_CONTENT, EMPTY_INVALID）
+- [x] **T002**: 实现 `classify_item(item_data, notion)` 函数，URL 非空返回 URL_RESOURCE
+- [x] **T003**: 修改 `preprocess.py`，集成 classify_item，URL_RESOURCE 走现有抓取流程
 
 **Independent Test**: 保存带 URL 条目，验证识别为 URL_RESOURCE 并执行抓取。
 
@@ -23,10 +23,10 @@
 
 ### Tasks
 
-- [ ] **T004**: 在 `src/notion.py` 添加 `has_page_blocks(page_id)` 方法，使用 page_size=1 检测内容块
-- [ ] **T005**: 扩展 classify_item，无 URL 时调用 has_page_blocks，有内容返回 NOTE_CONTENT
-- [ ] **T006**: 在 `src/utils.py` 添加 `generate_note_name(existing_count)` 函数，格式 NOTE-YYYYMMDD-N
-- [ ] **T007**: 修改 preprocess.py，NOTE_CONTENT 类型直接设置 ready 状态，使用 generate_note_name 命名
+- [x] **T004**: 在 `src/notion.py` 添加 `has_page_blocks(page_id)` 方法，使用 page_size=1 检测内容块
+- [x] **T005**: 扩展 classify_item，无 URL 时调用 has_page_blocks，有内容返回 NOTE_CONTENT
+- [x] **T006**: 在 `src/utils.py` 添加 `generate_note_name(existing_count)` 函数，格式 NOTE-YYYYMMDD-N
+- [x] **T007**: 修改 preprocess.py，NOTE_CONTENT 类型直接设置 ready 状态，使用 generate_note_name 命名
 
 **Independent Test**: 保存纯文本条目（无 URL），验证识别为 NOTE_CONTENT 并标记 ready。
 
@@ -38,8 +38,8 @@
 
 ### Tasks
 
-- [ ] **T008**: 扩展 classify_item，无 URL 且无内容块返回 EMPTY_INVALID
-- [ ] **T009**: 修改 preprocess.py，EMPTY_INVALID 类型调用 mark_as_error 并记录 Reason
+- [x] **T008**: 扩展 classify_item，无 URL 且无内容块返回 EMPTY_INVALID
+- [x] **T009**: 修改 preprocess.py，EMPTY_INVALID 类型调用 mark_as_error 并记录 Reason
 
 **Independent Test**: 保存空条目，验证识别为 EMPTY_INVALID 并标记 Error。
 
@@ -49,8 +49,8 @@
 
 ### Tasks
 
-- [ ] **T010**: 创建 `tests/test_routing.py`，测试 ItemType 枚举和 classify_item 函数
-- [ ] **T011**: 扩展 `tests/test_preprocess.py`，测试路由集成逻辑
+- [x] **T010**: 创建 `tests/test_routing.py`，测试 ItemType 枚举和 classify_item 函数
+- [x] **T011**: 扩展 `tests/test_preprocess.py`，测试路由集成逻辑
 
 ---
 
@@ -69,15 +69,15 @@
 
 | Task | Status | Notes |
 |------|--------|-------|
-| T001 | ⬜ | |
-| T002 | ⬜ | |
-| T003 | ⬜ | |
-| T004 | ⬜ | |
-| T005 | ⬜ | |
-| T006 | ⬜ | |
-| T007 | ⬜ | |
-| T008 | ⬜ | |
-| T009 | ⬜ | |
-| T010 | ⬜ | |
-| T011 | ⬜ | |
+| T001 | ✅ | src/routing.py created with ItemType enum |
+| T002 | ✅ | classify_item() implemented |
+| T003 | ✅ | preprocess.py integrated with URL_RESOURCE flow |
+| T004 | ✅ | has_page_blocks() added to NotionManager |
+| T005 | ✅ | classify_item handles NOTE_CONTENT |
+| T006 | ✅ | generate_note_name() added to utils.py |
+| T007 | ✅ | preprocess.py handles NOTE_CONTENT |
+| T008 | ✅ | classify_item handles EMPTY_INVALID |
+| T009 | ✅ | preprocess.py marks EMPTY_INVALID as Error |
+| T010 | ✅ | tests/test_routing.py created (13 tests) |
+| T011 | ✅ | tests/test_preprocess.py updated (17 tests) |
 

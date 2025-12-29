@@ -98,6 +98,23 @@ Object.defineProperty(navigator, 'plugins', { get: () => [1,2,3,4,5] });
         "timezone_id": os.getenv("ANTI_BOT_TIMEZONE", "America/Los_Angeles"),
     }
 
+def generate_note_name(sequence: int = 1) -> str:
+    """
+    Generate a name for NOTE_CONTENT items.
+    
+    Format: NOTE-YYYYMMDD-N where N is the sequence number.
+    
+    Args:
+        sequence: Sequence number for the day (1-based)
+        
+    Returns:
+        Generated note name like "NOTE-20251229-1"
+    """
+    from datetime import datetime
+    today = datetime.now().strftime("%Y%m%d")
+    return f"NOTE-{today}-{sequence}"
+
+
 def normalize_tweet_url(url: str) -> Optional[str]:
     """Return normalized tweet URL if valid, else None."""
     from urllib.parse import urlparse

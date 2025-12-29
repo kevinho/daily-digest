@@ -1,3 +1,11 @@
+"""
+Preprocessing module for Notion items.
+
+Uses smart routing to classify items and apply appropriate processing:
+- URL_RESOURCE: Fetch title from URL, backfill if needed
+- NOTE_CONTENT: Generate NOTE-YYYYMMDD-N name, mark ready
+- EMPTY_INVALID: Mark as Error
+"""
 import asyncio
 import logging
 from datetime import datetime
@@ -5,6 +13,8 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 from src.browser import fetch_page_content, fetch_page_title
+from src.routing import ItemType, classify_item
+from src.utils import generate_note_name
 
 
 def _first_non_empty_line(text: str) -> Optional[str]:
@@ -62,8 +72,8 @@ def _is_meaningful_name(name: str, url: Optional[str]) -> bool:
     return True
 
 
-def preprocess_item(page: Dict[str, Any], notion: Any, cdp_url: str) -> Dict[str, Any]:
-    """Enforce mandatory fields and backfill Name when possible."""
+def _process_url_resource(page: Dict[str, Any], notion: Any, cdp_url: str) -> Dict[str, Any]:
+    """Process URL_RESOURCE: backfill title from URL if needed."""
     page_id = page.get("id", "")
     name = (page.get("title") or "").strip()
     url = page.get("url")
@@ -71,56 +81,104 @@ def preprocess_item(page: Dict[str, Any], notion: Any, cdp_url: str) -> Dict[str
     attachments: List[str] = page.get("attachments") or []
 
     has_name = _is_meaningful_name(name, url)
-    has_url = bool(url)
-    has_content = bool(raw_content or attachments)
 
-    if has_name and not (has_url or has_content):
-        notion.mark_as_error(page_id, "missing URL and Content")
-        return {"action": "error", "reason": "missing URL/Content"}
+    if has_name:
+        # Already has meaningful name, skip
+        return {"action": "skip", "item_type": "url_resource"}
 
-    if not has_name and not (has_url or has_content):
-        # Fallback for image-only blocks (no URL/content/attachments captured)
-        suffix = page_id[-4:] if page_id else "0000"
-        title = f"Image-{datetime.now().strftime('%Y%m%d')}-{suffix}"
-        notion.set_title(page_id, title, note="Backfilled image placeholder (no URL/Content)")
-        return {"action": "backfilled", "title": title}
+    # Need to backfill title
+    title = None
+    if url:
+        title = fetch_title_from_url(url, cdp_url)
+        if not title:
+            text = fetch_text_from_url(url, cdp_url) or ""
+            title = derive_title_from_content(text)
+    if not title and raw_content:
+        title = derive_title_from_content(raw_content)
+    if not title and attachments:
+        title = attachments[0].split("/")[-1][:140]
+    if not title and url:
+        domain = _domain_from_url(url)
+        if domain:
+            title = f"Bookmark:{domain}"[:140]
 
-    if not has_name:
-        title = None
-        if has_url:
-            title = fetch_title_from_url(url, cdp_url)
-            if not title:
-                text = fetch_text_from_url(url, cdp_url) or ""
-                title = derive_title_from_content(text)
-        if not title and raw_content:
-            title = derive_title_from_content(raw_content)
-        if not title and attachments:
-            title = attachments[0].split("/")[-1][:140]
-        if not title and has_url:
-            domain = _domain_from_url(url)
-            if domain:
-                title = f"Bookmark:{domain}"[:140]
-        if not title and not has_url and attachments:
-            title = "Image Clip"
+    if title:
+        notion.set_title(page_id, title, note="Backfilled Name from URL")
+        return {"action": "backfilled", "title": title, "item_type": "url_resource"}
 
-        if title:
-            notion.set_title(page_id, title, note="Backfilled Name during preprocessing")
-            return {"action": "backfilled", "title": title}
+    notion.mark_as_error(page_id, "unable to backfill Name from URL")
+    return {"action": "error", "reason": "backfill failed", "item_type": "url_resource"}
 
-        notion.mark_as_error(page_id, "unable to backfill Name from URL/Content")
-        return {"action": "error", "reason": "backfill failed"}
 
-    return {"action": "skip"}
+def _process_note_content(page: Dict[str, Any], notion: Any, sequence: int) -> Dict[str, Any]:
+    """Process NOTE_CONTENT: generate name and mark ready."""
+    page_id = page.get("id", "")
+    name = (page.get("title") or "").strip()
+
+    has_name = _is_meaningful_name(name, None)
+
+    if has_name:
+        # Already has name, just mark ready
+        notion.mark_as_done(page_id, "Content note", status=notion.status.ready)
+        return {"action": "ready", "item_type": "note_content"}
+
+    # Generate NOTE-YYYYMMDD-N name
+    title = generate_note_name(sequence)
+    notion.set_title(page_id, title, note="Auto-generated note name")
+    notion.mark_as_done(page_id, "Content note", status=notion.status.ready)
+    return {"action": "ready", "title": title, "item_type": "note_content"}
+
+
+def _process_empty_invalid(page: Dict[str, Any], notion: Any, reason: str) -> Dict[str, Any]:
+    """Process EMPTY_INVALID: mark as Error."""
+    page_id = page.get("id", "")
+    notion.mark_as_error(page_id, reason)
+    return {"action": "error", "reason": reason, "item_type": "empty_invalid"}
+
+
+def preprocess_item(page: Dict[str, Any], notion: Any, cdp_url: str, note_sequence: int = 1) -> Dict[str, Any]:
+    """
+    Preprocess a single item using smart routing.
+    
+    Args:
+        page: Simplified page data from NotionManager
+        notion: NotionManager instance
+        cdp_url: Chrome DevTools Protocol URL
+        note_sequence: Sequence number for NOTE_CONTENT naming
+        
+    Returns:
+        Dict with action, reason, item_type, and optionally title
+    """
+    item_type, reason = classify_item(page, notion)
+    
+    if item_type == ItemType.URL_RESOURCE:
+        return _process_url_resource(page, notion, cdp_url)
+    elif item_type == ItemType.NOTE_CONTENT:
+        return _process_note_content(page, notion, note_sequence)
+    else:  # EMPTY_INVALID
+        return _process_empty_invalid(page, notion, reason)
 
 
 def preprocess_batch(pages: List[Dict[str, Any]], notion: Any, cdp_url: str) -> Dict[str, int]:
-    counters = {"backfilled": 0, "error": 0, "skip": 0}
+    """
+    Preprocess a batch of items.
+    
+    Returns counters for each action type.
+    """
+    counters = {"backfilled": 0, "error": 0, "skip": 0, "ready": 0}
+    note_sequence = 1  # Track sequence for NOTE_CONTENT items today
+    
     for page in pages:
-        result = preprocess_item(page, notion, cdp_url)
+        result = preprocess_item(page, notion, cdp_url, note_sequence)
         action = result.get("action", "skip")
+        
         if action in counters:
             counters[action] += 1
         else:
             counters["skip"] += 1
+        
+        # Increment sequence for NOTE_CONTENT
+        if result.get("item_type") == "note_content" and action == "ready":
+            note_sequence += 1
+    
     return counters
-

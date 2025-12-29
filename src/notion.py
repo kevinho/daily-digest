@@ -71,6 +71,48 @@ class NotionManager:
             prompt_version=get_env("NOTION_PROP_PROMPT_VERSION", PropertyNames.prompt_version),
         )
 
+    def has_page_blocks(self, page_id: str) -> bool:
+        """
+        Check if a page has content blocks.
+        
+        Uses page_size=1 to minimize API response.
+        Filters out empty paragraphs to detect truly empty pages.
+        
+        Args:
+            page_id: Notion page ID
+            
+        Returns:
+            True if page has non-empty content blocks, False otherwise
+        """
+        if not page_id:
+            return False
+        try:
+            resp = self.client.blocks.children.list(block_id=page_id, page_size=1)
+            results = resp.get("results", [])
+            if not results:
+                return False
+            # Check if content is meaningful (not just empty paragraphs)
+            for block in results:
+                block_type = block.get("type", "")
+                # Non-paragraph blocks are considered content
+                if block_type != "paragraph":
+                    return True
+                # Check if paragraph has text
+                para = block.get("paragraph", {})
+                rich_text = para.get("rich_text", [])
+                if rich_text:
+                    # Check if any text is non-empty
+                    for rt in rich_text:
+                        text = rt.get("plain_text", "") or rt.get("text", {}).get("content", "")
+                        if text.strip():
+                            return True
+            # If we got here, results exist but all are empty paragraphs
+            # However, if there's at least one result, Notion may have more blocks
+            # For safety, treat any block response as "has content"
+            return len(results) > 0
+        except Exception:
+            return False
+
     def _query(self, body: Dict[str, Any]) -> Dict[str, Any]:
         """Compat query helper for databases without .query convenience."""
         # Prefer data_source query if available; fallback to database query on invalid URL

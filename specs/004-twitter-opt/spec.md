@@ -55,6 +55,9 @@
 - 插件条目缺 URL/URL 与正文不符。  
 - 同一 tweet 多次保存/处理的重复。  
 - Playwright/CDP 会话失效或配置错误导致无法连接。
+- 条目合法性：既无 URL 也无正文/附件 → 直接 Error（missing url/content）。  
+- 仅图片/附件无 URL：判定有效但标记为未处理（unprocessed），留 Reason。  
+- 仅 URL 无正文：允许抓取；抓取失败则 Error+Reason（如 JS 阻断）。  
 
 ## Requirements *(mandatory)*
 
@@ -66,6 +69,8 @@
 - **FR-004**: 系统 SHOULD 允许通过配置（env/文件）调整反爬参数（UA/viewport/init_script/args）与 CDP 端点；配置变更无需改代码。  
 - **FR-005**: 系统 MUST 支持重试与恢复：阻断后登录恢复可成功抓取；失败项可再次处理。  
 - **FR-006**: 系统 MUST 保持幂等：重复运行同一 Canonical URL 不重复写入内容或摘要。  
+- **FR-007**: 系统 MUST 执行合法性校验：条目需满足 Has URL 或 Has Body(正文/附件)；否则标记 Error(missing url/content)。  
+- **FR-008**: 系统 SHOULD 做标题清洗：当 Name 为空/默认值("New page"/"Untitled"/域名) 时，尝试补 title；若抓取失败，可用“Bookmark:{domain}”或内容前 20 字，纯图片则用 “Image Clip”。  
 
 ### Key Entities
 

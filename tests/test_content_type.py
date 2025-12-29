@@ -5,6 +5,7 @@ from src.content_type import (
     ContentType,
     parse_mime_type,
     infer_from_extension,
+    infer_from_domain,
 )
 
 
@@ -153,4 +154,42 @@ class TestInferFromExtension:
         # May or may not work depending on implementation
         # Just verify it doesn't crash
         assert result in [ContentType.HTML, ContentType.UNKNOWN]
+
+
+class TestInferFromDomain:
+    """Test domain-based ContentType inference."""
+    
+    def test_weixin_domain(self):
+        """WeChat articles should be detected as HTML."""
+        assert infer_from_domain("https://mp.weixin.qq.com/s/abc123") == ContentType.HTML
+    
+    def test_twitter_domains(self):
+        """Twitter/X should be detected as HTML."""
+        assert infer_from_domain("https://twitter.com/user/status/123") == ContentType.HTML
+        assert infer_from_domain("https://x.com/user/status/123") == ContentType.HTML
+    
+    def test_chinese_platforms(self):
+        """Chinese platforms should be detected as HTML."""
+        assert infer_from_domain("https://www.zhihu.com/question/123") == ContentType.HTML
+        assert infer_from_domain("https://juejin.cn/post/123") == ContentType.HTML
+        assert infer_from_domain("https://www.jianshu.com/p/123") == ContentType.HTML
+        assert infer_from_domain("https://blog.csdn.net/user/article/123") == ContentType.HTML
+    
+    def test_subdomain_match(self):
+        """Subdomains should also match."""
+        assert infer_from_domain("https://www.github.com/user/repo") == ContentType.HTML
+        assert infer_from_domain("https://blog.medium.com/post") == ContentType.HTML
+    
+    def test_unknown_domain(self):
+        """Unknown domains should return UNKNOWN."""
+        assert infer_from_domain("https://unknown-site.xyz/page") == ContentType.UNKNOWN
+        assert infer_from_domain("https://random123.com/file") == ContentType.UNKNOWN
+    
+    def test_empty_url(self):
+        """Empty URL should return UNKNOWN."""
+        assert infer_from_domain("") == ContentType.UNKNOWN
+    
+    def test_invalid_url(self):
+        """Invalid URL should return UNKNOWN."""
+        assert infer_from_domain("not-a-url") == ContentType.UNKNOWN
 

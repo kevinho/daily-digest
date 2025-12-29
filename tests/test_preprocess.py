@@ -367,31 +367,56 @@ def test_url_resource_sets_content_type(monkeypatch):
 
 
 def test_pdf_content_type_marks_unprocessed(monkeypatch):
-    """PDF ContentType should mark item as unprocessed."""
+    """PDF ContentType should backfill title from filename then mark as unprocessed."""
     notion = StubNotion()
     monkeypatch.setattr(preprocess, "detect_content_type_sync", lambda url, timeout=5.0: (ContentType.PDF, "Content-Type: application/pdf"))
     
     page = {"id": "ct2", "title": "", "url": "http://example.com/doc.pdf", "attachments": [], "raw_content": ""}
     result = preprocess.preprocess_item(page, notion, "cdp")
     
-    assert result["action"] == "unprocessed"
+    # Should still backfill title from filename
+    assert result["action"] == "backfilled"
     assert result["content_type"] == "pdf"
+    assert result["title"] == "doc.pdf"
     assert notion.content_types.get("ct2") == "pdf"
+    assert notion.titles.get("ct2", {}).get("title") == "doc.pdf"
+    # Should also mark as unprocessed
     assert "ct2" in notion.unprocessed
     assert "future" in notion.unprocessed["ct2"].lower()
 
 
 def test_image_content_type_marks_unprocessed(monkeypatch):
-    """IMAGE ContentType should mark item as unprocessed."""
+    """IMAGE ContentType should backfill title from filename then mark as unprocessed."""
     notion = StubNotion()
     monkeypatch.setattr(preprocess, "detect_content_type_sync", lambda url, timeout=5.0: (ContentType.IMAGE, "Content-Type: image/jpeg"))
     
     page = {"id": "ct3", "title": "", "url": "http://example.com/photo.jpg", "attachments": [], "raw_content": ""}
     result = preprocess.preprocess_item(page, notion, "cdp")
     
-    assert result["action"] == "unprocessed"
+    # Should still backfill title from filename
+    assert result["action"] == "backfilled"
     assert result["content_type"] == "image"
+    assert result["title"] == "photo.jpg"
     assert notion.content_types.get("ct3") == "image"
+    assert notion.titles.get("ct3", {}).get("title") == "photo.jpg"
+    # Should also mark as unprocessed
+    assert "ct3" in notion.unprocessed
+
+
+def test_pdf_with_existing_name_marks_skip(monkeypatch):
+    """PDF with existing name should skip title backfill but still mark unprocessed."""
+    notion = StubNotion()
+    monkeypatch.setattr(preprocess, "detect_content_type_sync", lambda url, timeout=5.0: (ContentType.PDF, "Content-Type: application/pdf"))
+    
+    page = {"id": "ct4", "title": "My Document", "url": "http://example.com/doc.pdf", "attachments": [], "raw_content": ""}
+    result = preprocess.preprocess_item(page, notion, "cdp")
+    
+    # Should skip title backfill since name exists
+    assert result["action"] == "skip"
+    assert result["content_type"] == "pdf"
+    assert notion.content_types.get("ct4") == "pdf"
+    # Should still mark as unprocessed
+    assert "ct4" in notion.unprocessed
 
 
 # ============================================================

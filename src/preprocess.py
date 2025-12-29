@@ -103,48 +103,77 @@ def _process_url_resource(page: Dict[str, Any], notion: Any, cdp_url: str) -> Di
     # Always set ContentType in Notion
     notion.set_content_type(page_id, content_type.value)
 
-    # Check if ContentType is processable
+    # Check if name needs backfill (applies to ALL content types)
+    has_name = _is_meaningful_name(name, url)
+    title = None
+
+    if not has_name:
+        # Try to backfill title regardless of ContentType
+        if url:
+            # For processable types, try fetching title from page
+            if content_type.processable or content_type == ContentType.UNKNOWN:
+                title = fetch_title_from_url(url, cdp_url)
+                if not title:
+                    text = fetch_text_from_url(url, cdp_url) or ""
+                    title = derive_title_from_content(text)
+            else:
+                # For non-processable types (PDF, IMAGE, etc.), use URL filename
+                title = _extract_filename_from_url(url)
+        
+        if not title and raw_content:
+            title = derive_title_from_content(raw_content)
+        if not title and attachments:
+            title = attachments[0].split("/")[-1][:140]
+        if not title and url:
+            domain = _domain_from_url(url)
+            if domain:
+                title = f"Bookmark:{domain}"[:140]
+
+        if title:
+            notion.set_title(page_id, title, note="Backfilled Name from URL")
+
+    # Now handle based on ContentType processability
     if not content_type.processable and content_type != ContentType.UNKNOWN:
         # Non-processable content (PDF, IMAGE, VIDEO, AUDIO, BINARY)
         reason = f"ContentType '{content_type.value}' not processable yet"
         if content_type.future_support:
             reason += " (future support planned)"
         notion.mark_unprocessed(page_id, reason)
+        action = "backfilled" if title else ("skip" if has_name else "unprocessed")
         return {
-            "action": "unprocessed",
+            "action": action,
             "reason": reason,
             "item_type": "url_resource",
             "content_type": content_type.value,
+            "title": title,
         }
 
-    has_name = _is_meaningful_name(name, url)
-
+    # Processable content type
     if has_name:
-        # Already has meaningful name, skip title backfill
         return {"action": "skip", "item_type": "url_resource", "content_type": content_type.value}
-
-    # Need to backfill title
-    title = None
-    if url:
-        title = fetch_title_from_url(url, cdp_url)
-        if not title:
-            text = fetch_text_from_url(url, cdp_url) or ""
-            title = derive_title_from_content(text)
-    if not title and raw_content:
-        title = derive_title_from_content(raw_content)
-    if not title and attachments:
-        title = attachments[0].split("/")[-1][:140]
-    if not title and url:
-        domain = _domain_from_url(url)
-        if domain:
-            title = f"Bookmark:{domain}"[:140]
-
+    
     if title:
-        notion.set_title(page_id, title, note="Backfilled Name from URL")
         return {"action": "backfilled", "title": title, "item_type": "url_resource", "content_type": content_type.value}
 
     notion.mark_as_error(page_id, "unable to backfill Name from URL")
     return {"action": "error", "reason": "backfill failed", "item_type": "url_resource", "content_type": content_type.value}
+
+
+def _extract_filename_from_url(url: str) -> Optional[str]:
+    """Extract filename from URL path for non-HTML resources."""
+    try:
+        parsed = urlparse(url)
+        path = parsed.path
+        if path:
+            # Get last segment of path
+            filename = path.rstrip("/").split("/")[-1]
+            # Remove query params if any leaked through
+            filename = filename.split("?")[0]
+            if filename and "." in filename:
+                return filename[:140]
+        return None
+    except Exception:
+        return None
 
 
 def _process_note_content(page: Dict[str, Any], notion: Any, sequence: int) -> Dict[str, Any]:

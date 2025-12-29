@@ -101,6 +101,23 @@ EXTENSION_MAP = {
     ".csv": ContentType.TEXT,
 }
 
+# Domains known to serve HTML (used as fallback when HEAD fails)
+HTML_DOMAINS = {
+    # Social media
+    "twitter.com", "x.com", "facebook.com", "instagram.com", "linkedin.com",
+    "reddit.com", "tiktok.com", "youtube.com", "youtu.be",
+    # Chinese platforms
+    "mp.weixin.qq.com", "weixin.qq.com", "weibo.com", "zhihu.com",
+    "juejin.cn", "jianshu.com", "csdn.net", "bilibili.com",
+    "xiaohongshu.com", "douyin.com", "toutiao.com",
+    # News & articles
+    "medium.com", "substack.com", "notion.so", "notion.site",
+    "github.com", "gitlab.com", "stackoverflow.com",
+    # General article sites
+    "nytimes.com", "washingtonpost.com", "bbc.com", "cnn.com",
+    "theguardian.com", "techcrunch.com", "arstechnica.com",
+}
+
 
 def parse_mime_type(content_type_header: Optional[str]) -> ContentType:
     """
@@ -162,6 +179,56 @@ def infer_from_extension(url: str) -> ContentType:
         return ContentType.UNKNOWN
 
 
+def infer_from_domain(url: str) -> ContentType:
+    """
+    Infer ContentType from known domain patterns.
+    
+    Used as fallback when HEAD request fails.
+    
+    Args:
+        url: URL string
+        
+    Returns:
+        ContentType.HTML if domain is known to serve HTML, UNKNOWN otherwise
+    """
+    try:
+        parsed = urlparse(url)
+        hostname = (parsed.hostname or "").lower()
+        
+        # Check exact domain match
+        for domain in HTML_DOMAINS:
+            if hostname == domain or hostname.endswith("." + domain):
+                return ContentType.HTML
+        
+        return ContentType.UNKNOWN
+    except Exception:
+        return ContentType.UNKNOWN
+
+
+def _fallback_inference(url: str, reason_prefix: str) -> Tuple[ContentType, str]:
+    """
+    Chain of fallback inferences: extension -> domain -> unknown.
+    
+    Args:
+        url: URL to check
+        reason_prefix: Prefix for the reason string (e.g., "HEAD timeout")
+        
+    Returns:
+        Tuple of (ContentType, reason_string)
+    """
+    # Try extension first
+    ext_type = infer_from_extension(url)
+    if ext_type != ContentType.UNKNOWN:
+        return (ext_type, f"Inferred from extension ({reason_prefix})")
+    
+    # Try domain-based inference
+    domain_type = infer_from_domain(url)
+    if domain_type != ContentType.UNKNOWN:
+        return (domain_type, f"Inferred from domain ({reason_prefix})")
+    
+    return (ContentType.UNKNOWN, reason_prefix)
+
+
 async def detect_content_type(
     url: str,
     timeout: float = 5.0,
@@ -172,7 +239,7 @@ async def detect_content_type(
     Detect ContentType via HTTP HEAD request.
     
     Uses HEAD request to avoid downloading full content.
-    Falls back to URL extension if HEAD fails.
+    Falls back to URL extension, then domain inference if HEAD fails.
     
     Args:
         url: URL to check
@@ -186,11 +253,7 @@ async def detect_content_type(
     try:
         import httpx
     except ImportError:
-        # Fall back to extension inference if httpx not installed
-        ext_type = infer_from_extension(url)
-        if ext_type != ContentType.UNKNOWN:
-            return (ext_type, f"Inferred from extension (httpx not installed)")
-        return (ContentType.UNKNOWN, "httpx not installed, no extension match")
+        return _fallback_inference(url, "httpx not installed")
     
     try:
         async with httpx.AsyncClient(
@@ -211,6 +274,11 @@ async def detect_content_type(
             if ext_type != ContentType.UNKNOWN:
                 return (ext_type, f"Inferred from extension (no Content-Type header)")
             
+            # Fallback to domain
+            domain_type = infer_from_domain(url)
+            if domain_type != ContentType.UNKNOWN:
+                return (domain_type, f"Inferred from domain (no Content-Type header)")
+            
             # If response was successful but no type detected, assume HTML
             if resp.status_code < 400:
                 return (ContentType.HTML, "Assumed HTML (successful response, no Content-Type)")
@@ -218,18 +286,10 @@ async def detect_content_type(
             return (ContentType.UNKNOWN, f"HTTP {resp.status_code}, no Content-Type")
             
     except httpx.TimeoutException:
-        # Fall back to extension on timeout
-        ext_type = infer_from_extension(url)
-        if ext_type != ContentType.UNKNOWN:
-            return (ext_type, "Inferred from extension (HEAD timeout)")
-        return (ContentType.UNKNOWN, "HEAD request timeout")
+        return _fallback_inference(url, "HEAD timeout")
         
     except Exception as e:
-        # Fall back to extension on error
-        ext_type = infer_from_extension(url)
-        if ext_type != ContentType.UNKNOWN:
-            return (ext_type, f"Inferred from extension (HEAD error: {e})")
-        return (ContentType.UNKNOWN, f"HEAD request failed: {e}")
+        return _fallback_inference(url, f"HEAD error: {e}")
 
 
 def detect_content_type_sync(url: str, timeout: float = 5.0) -> Tuple[ContentType, str]:

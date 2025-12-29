@@ -1,5 +1,10 @@
 """
 Digest service - orchestrates recursive summarization.
+
+Key points:
+- Daily digest: Queries INBOX DB for "ready" items by created_time
+- Weekly digest: Queries REPORTING DB for "Daily" reports
+- Monthly digest: Queries REPORTING DB for "Weekly" reports
 """
 
 import logging
@@ -77,9 +82,12 @@ class DigestService:
                 logger.info(f"Daily report already exists for {start_date}: {existing.get('id')}")
                 return existing.get("id")
         
-        # Query items from Inbox
-        items = self.inbox.fetch_items_for_date(start_date)
-        logger.info(f"Found {len(items)} items for {start_date}")
+        # Query items from Inbox - fetch "ready" items for the date
+        # Use fetch_ready_for_digest with date filter for better results
+        since = f"{start_date.isoformat()}T00:00:00"
+        until = f"{start_date.isoformat()}T23:59:59"
+        items = self.inbox.fetch_ready_for_digest(since=since, until=until, include_private=False)
+        logger.info(f"Found {len(items)} ready items for {start_date} from Inbox DB")
         
         if not items:
             logger.warning(f"No items found for {start_date}, skipping digest")

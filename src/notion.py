@@ -456,14 +456,28 @@ class NotionManager:
         citations_text = f"引用: {len(citations)}条" if citations else "引用: 无"
         children_blocks.append(self._block_paragraph(citations_text))
 
+        # Notion API limit: max 100 children per request
+        # Create page with first batch, then append remaining in chunks
+        BATCH_SIZE = 100
+        first_batch = children_blocks[:BATCH_SIZE]
+        remaining = children_blocks[BATCH_SIZE:]
+
         page = self.client.pages.create(
             parent={"type": "page_id", "page_id": self.digest_parent_id},
             properties={
                 "title": {"title": [{"text": {"content": title}}]},
             },
-            children=children_blocks,
+            children=first_batch,
         )
-        return page.get("id")
+        page_id = page.get("id")
+
+        # Append remaining blocks in batches
+        if page_id and remaining:
+            for i in range(0, len(remaining), BATCH_SIZE):
+                batch = remaining[i : i + BATCH_SIZE]
+                self.client.blocks.children.append(block_id=page_id, children=batch)
+
+        return page_id
 
     def mark_as_done(self, page_id: str, summary: str, status: Optional[str] = None) -> None:
         props = {

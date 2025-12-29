@@ -188,9 +188,8 @@ class DailyReportBuilder:
                 url = item.get("url", "")
                 page_link = item.get("page_link", "")
                 
-                # Use AI summary as display text if available, otherwise use title
-                # Summary is more concise and AI-generated
-                display_text = summary[:100] if summary else title[:80]
+                # Clean summary: remove TLDR/Insights labels and get first line only
+                display_text = _clean_summary(summary) if summary else title[:80]
                 
                 # Prefer page_link for Notion internal linking, fall back to external URL
                 link = page_link or url
@@ -513,6 +512,35 @@ def _bullet(text: str) -> Dict:
 def _divider() -> Dict:
     """Create a divider block."""
     return {"object": "block", "type": "divider", "divider": {}}
+
+
+def _clean_summary(summary: str) -> str:
+    """
+    Clean summary text: remove TLDR/Insights labels and get first meaningful line.
+    
+    Input might be:
+        "**TLDR:** Some text.\n**Insights:**\n1. Point one\n2. Point two"
+    Output:
+        "Some text."
+    """
+    import re
+    
+    if not summary:
+        return ""
+    
+    # Remove common prefixes
+    text = summary.strip()
+    
+    # Remove **TLDR:** or TLDR: prefix (with or without bold markers)
+    text = re.sub(r'^\*{0,2}TLDR:?\*{0,2}\s*', '', text, flags=re.IGNORECASE)
+    
+    # Get first line only (before Insights or newline)
+    # Split by common delimiters: newline, **Insights, Insights:
+    parts = re.split(r'\n|\*{0,2}Insights:?\*{0,2}', text, maxsplit=1)
+    first_line = parts[0].strip() if parts else text
+    
+    # Truncate to reasonable length
+    return first_line[:100]
 
 
 def _callout(text: str, icon: str = "📌", url: str = None) -> Dict:

@@ -1,9 +1,10 @@
 import asyncio
 import logging
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-from src.browser import fetch_page_content
+from src.browser import fetch_page_content, fetch_page_title
 
 
 def _first_non_empty_line(text: str) -> Optional[str]:
@@ -28,6 +29,14 @@ def fetch_text_from_url(url: str, cdp_url: str) -> Optional[str]:
         return None
 
 
+def fetch_title_from_url(url: str, cdp_url: str) -> Optional[str]:
+    try:
+        return asyncio.run(fetch_page_title(url, cdp_url))
+    except Exception as exc:
+        logging.warning("Preprocess: fetch_page_title failed for %s: %s", url, exc)
+        return None
+
+
 def _domain_from_url(url: Optional[str]) -> Optional[str]:
     if not url:
         return None
@@ -42,6 +51,11 @@ def _is_meaningful_name(name: str, url: Optional[str]) -> bool:
     """Treat empty/placeholder/domain-like names as missing."""
     cleaned = (name or "").strip()
     if not cleaned:
+        return False
+    # Long paragraphs are likely body text, not a title
+    if len(cleaned) > 120:
+        return False
+    if len(cleaned.split()) > 15:
         return False
     lowered = cleaned.lower()
     if lowered in {"untitled", "new page", "bookmark", "default"}:
@@ -70,14 +84,19 @@ def preprocess_item(page: Dict[str, Any], notion: Any, cdp_url: str) -> Dict[str
         return {"action": "error", "reason": "missing URL/Content"}
 
     if not has_name and not (has_url or has_content):
-        notion.mark_as_error(page_id, "missing Name and URL/Content")
-        return {"action": "error", "reason": "missing all required fields"}
+        # Fallback for image-only blocks (no URL/content/attachments captured)
+        suffix = page_id[-4:] if page_id else "0000"
+        title = f"Image-{datetime.now().strftime('%Y%m%d')}-{suffix}"
+        notion.set_title(page_id, title, note="Backfilled image placeholder (no URL/Content)")
+        return {"action": "backfilled", "title": title}
 
     if not has_name:
         title = None
         if has_url:
-            text = fetch_text_from_url(url, cdp_url) or ""
-            title = derive_title_from_content(text)
+            title = fetch_title_from_url(url, cdp_url)
+            if not title:
+                text = fetch_text_from_url(url, cdp_url) or ""
+                title = derive_title_from_content(text)
         if not title and raw_content:
             title = derive_title_from_content(raw_content)
         if not title and attachments:

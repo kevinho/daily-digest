@@ -4,8 +4,11 @@ from typing import Dict, List, Tuple, Optional
 
 from dotenv import load_dotenv
 
-# Ensure .env is loaded even when llm is imported standalone
-load_dotenv()
+# Ensure .env is loaded even when llm is imported standalone; tolerate permission issues
+try:
+    load_dotenv()
+except PermissionError:
+    pass
 
 
 def generate_digest(text: str) -> Dict[str, str]:

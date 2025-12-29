@@ -1,3 +1,4 @@
+import json
 import types
 
 import pytest
@@ -13,6 +14,7 @@ class StubNotion:
         self.done = {}
         self.duplicates = {}
         self.props = {}
+        self.titles = {}
         self._find_return = None
 
         class Status:
@@ -23,6 +25,9 @@ class StubNotion:
             unprocessed = "unprocessed"
 
         self.status = Status()
+
+    def set_title(self, page_id: str, title: str, note: str = ""):
+        self.titles[page_id] = {"title": title, "note": note}
 
     def find_by_canonical(self, canonical_url):
         return self._find_return
@@ -182,3 +187,105 @@ def test_plugin_source(monkeypatch):
     assert notion.classifications["6"]["source"] == "plugin"
     assert notion.done["6"]["status"] == notion.status.ready
 
+
+def test_twitter_end_to_end_title_and_body(monkeypatch):
+    """End-to-end: preprocess fills title, process stores body."""
+    # Arrange stubs
+    notion = StubNotion()
+    tweet_url = "https://x.com/demishassabis/status/2005358760047562802?s=12&t=kmKQtU-_oyvUW6FjhHSNTw"
+    page = {"id": "7", "title": "", "url": tweet_url, "attachments": [], "raw_content": ""}
+    expected_title = (
+        'Demis Hassabis on X: "Amazing work from the incredibly talented Director Greg Kohs, '
+        "Producers Gary Kreig & Jonathan Fildes, and a wonderful score from the maestro Dan Deacon - enjoy! "
+        'https://t.co/fagdivZ9qN" / X'
+    )
+    body = (
+        "Amazing work from the incredibly talented Director Greg Kohs, Producers Gary Kreig & Jonathan Fildes, "
+        "and a wonderful score from the maestro Dan Deacon - enjoy!"
+    )
+
+    # Preprocess: mock title/text fetch
+    from src import preprocess
+
+    monkeypatch.setattr(preprocess, "fetch_title_from_url", lambda url, cdp: expected_title)
+    monkeypatch.setattr(preprocess, "fetch_text_from_url", lambda url, cdp: body)
+    res = preprocess.preprocess_item(page, notion, "cdp")
+    assert res["action"] == "backfilled"
+    assert notion.titles["7"]["title"] == expected_title
+
+    # Process: mock content fetch/classify/summarize
+    async def _body(url, cdp_url):
+        return body
+
+    monkeypatch.setattr("main.fetch_page_content", _body)
+    monkeypatch.setattr(
+        "main.classify",
+        lambda text: {
+            "tags": ["twitter"],
+            "sensitivity": "public",
+            "confidence": 0.9,
+            "rule_version": "r",
+            "prompt_version": "p",
+        },
+    )
+    monkeypatch.setattr("main.generate_digest", lambda text: {"tldr": "tldr", "insights": ""})
+    result = main.process_item(page, notion, "http://localhost:9222")
+
+    print(json.dumps(notion.titles, indent=2))
+    assert result == "success"
+    assert notion.classifications["7"]["raw_content"] == body
+    assert notion.done["7"]["status"] == notion.status.ready
+    assert notion.done["7"]["summary"].startswith("tldr")
+
+
+def test_twitter_end_to_end_title_and_body_deepseek(monkeypatch):
+    """End-to-end for akshay_pachaar tweet with rich title/body."""
+    notion = StubNotion()
+    tweet_url = "https://x.com/akshay_pachaar/status/2005254986339610800?s=12&t=kmKQtU-_oyvUW6FjhHSNTw"
+    expected_title = (
+        'Akshay 🚀 on X: "This is the DeepSeek moment for Voice AI.\n\n'
+        "Chatterbox Turbo is an MIT-licensed voice model that beats ElevenLabs Turbo & Cartesia Sonic 3!\n\n"
+        "- <150ms time-to-first-sound\n"
+        "- Voice cloning from just 5-second audio\n"
+        "- Paralinguistic tags for real human expression\n\n"
+        "100% open-source. https://t.co/nu6ZpZDwOt\" / X"
+    )
+    body = (
+        "This is the DeepSeek moment for Voice AI.\n\n"
+        "Chatterbox Turbo is an MIT-licensed voice model that beats ElevenLabs Turbo & Cartesia Sonic 3!\n\n"
+        "- <150ms time-to-first-sound\n"
+        "- Voice cloning from just 5-second audio\n"
+        "- Paralinguistic tags for real human expression\n\n"
+        "100% open-source."
+    )
+
+    from src import preprocess
+
+    monkeypatch.setattr(preprocess, "fetch_title_from_url", lambda url, cdp: expected_title)
+    monkeypatch.setattr(preprocess, "fetch_text_from_url", lambda url, cdp: body)
+    page = {"id": "8", "title": "", "url": tweet_url, "attachments": [], "raw_content": ""}
+    res = preprocess.preprocess_item(page, notion, "cdp")
+    assert res["action"] == "backfilled"
+    assert notion.titles["8"]["title"] == expected_title
+
+    async def _body(url, cdp_url):
+        return body
+
+    monkeypatch.setattr("main.fetch_page_content", _body)
+    monkeypatch.setattr(
+        "main.classify",
+        lambda text: {
+            "tags": ["twitter"],
+            "sensitivity": "public",
+            "confidence": 0.9,
+            "rule_version": "r",
+            "prompt_version": "p",
+        },
+    )
+    monkeypatch.setattr("main.generate_digest", lambda text: {"tldr": "tldr", "insights": ""})
+    result = main.process_item(page, notion, "http://localhost:9222")
+
+    assert result == "success"
+    assert notion.classifications["8"]["raw_content"] == body
+    assert notion.done["8"]["status"] == notion.status.ready
+    assert notion.done["8"]["summary"].startswith("tldr")

@@ -5,17 +5,50 @@ import logging
 from datetime import datetime
 from typing import Optional
 
+try:
+    from tenacity import RetryError
+except Exception:  # pragma: no cover
+    RetryError = Exception
+
 from src.browser import fetch_page_content
 from src.llm import classify, generate_digest
 from src.notion import NotionManager
 from src.digest import build_digest
 from src.preprocess import preprocess_batch
 from src.utils import configure_logging, get_env, get_timezone, normalize_tweet_url
+from urllib.parse import urlparse
 
 
 def is_attachment_unprocessed(url: str) -> bool:
     lowered = url.lower()
     return lowered.endswith((".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp"))
+
+
+def _domain_from_url(url: Optional[str]) -> Optional[str]:
+    if not url:
+        return None
+    try:
+        parsed = urlparse(url)
+        return parsed.hostname
+    except Exception:
+        return None
+
+
+def _is_meaningful_name(name: str, url: Optional[str]) -> bool:
+    cleaned = (name or "").strip()
+    if not cleaned:
+        return False
+    if len(cleaned) > 120:
+        return False
+    if len(cleaned.split()) > 15:
+        return False
+    lowered = cleaned.lower()
+    if lowered in {"untitled", "new page", "bookmark", "default"}:
+        return False
+    domain = _domain_from_url(url)
+    if domain and (cleaned == domain or cleaned.startswith("http")):
+        return False
+    return True
 
 
 def process_item(page: dict, notion: NotionManager, cdp_url: str) -> str:
@@ -54,7 +87,15 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> str:
 
     try:
         text = asyncio.run(fetch_page_content(target_url, cdp_url))
-    except Exception as exc:  # catch RetryError/RuntimeError
+    except RetryError as exc:
+        last_exc = getattr(exc, "last_attempt", None)
+        if last_exc and last_exc.exception():
+            reason = str(last_exc.exception())
+        else:
+            reason = str(exc)
+        notion.mark_as_error(page_id, f"fetch failed: {reason}")
+        return "error"
+    except Exception as exc:  # catch RuntimeError, etc.
         notion.mark_as_error(page_id, f"fetch failed: {exc}")
         return "error"
 
@@ -90,12 +131,24 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> str:
         summary_text = (summary_text + "\n" + insights).strip()
     if confidence < threshold:
         notion.mark_as_done(page_id, summary_text, status=notion.status.pending)
+        # If title仍不够清晰，用摘要首行回填标题，便于辨识
+        title_existing = page.get("title", "")
+        if not _is_meaningful_name(title_existing, url):
+            fallback_title = summary_text.splitlines()[0][:140] if summary_text else ""
+            if fallback_title:
+                notion.set_title(page_id, fallback_title, note="Backfilled Name from summary (low confidence)")
         return "success"
 
     note_status = None
     if source == "plugin":
         note_status = notion.status.ready
     notion.mark_as_done(page_id, summary_text, status=note_status)
+    # Ready case也回填标题（若原有标题无意义）
+    title_existing = page.get("title", "")
+    if not _is_meaningful_name(title_existing, url):
+        fallback_title = summary_text.splitlines()[0][:140] if summary_text else ""
+        if fallback_title:
+            notion.set_title(page_id, fallback_title, note="Backfilled Name from summary")
     return "success"
 
 

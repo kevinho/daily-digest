@@ -53,18 +53,22 @@ class DailyReportBuilder:
         # Extract source IDs
         source_ids = [item.get("id") for item in items if item.get("id")]
         
+        # Always extract highlights with page links for content blocks
+        highlights_with_links = self._extract_highlights(items)
+        
         # Generate overview using AI if available
         if generate_overview_fn:
             overview_data = generate_overview_fn(items)
             overview = overview_data.get("overview", "")
-            highlights = overview_data.get("highlights", [])
+            # Use AI highlights for metadata, but use linked highlights for display
+            highlights = overview_data.get("highlights", [h.get("text", "") for h in highlights_with_links])
         else:
             # Fallback: simple count-based overview
             overview = self._fallback_overview(items, categories)
-            highlights = self._extract_highlights(items)
+            highlights = [h.get("text", "") for h in highlights_with_links]
         
-        # Build Notion content blocks
-        content_blocks = self._build_content_blocks(items, categories, highlights)
+        # Build Notion content blocks with linked highlights
+        content_blocks = self._build_content_blocks(items, categories, highlights_with_links)
         
         return ReportData(
             period=period,
@@ -98,20 +102,24 @@ class DailyReportBuilder:
         cat_names = "、".join(list(categories.keys())[:5])
         return f"今日收集{count}条内容，涵盖{cat_count}个类别：{cat_names}。"
     
-    def _extract_highlights(self, items: List[Dict], max_count: int = 5) -> List[str]:
-        """Extract top highlights from items."""
+    def _extract_highlights(self, items: List[Dict], max_count: int = 5) -> List[Dict]:
+        """Extract top highlights from items with page link info."""
         highlights = []
         for item in items[:max_count]:
             title = item.get("title", "")
             if title:
-                highlights.append(title[:50])  # Truncate long titles
+                highlights.append({
+                    "text": title[:80],
+                    "page_link": item.get("page_link", ""),
+                    "url": item.get("url", ""),
+                })
         return highlights
     
     def _build_content_blocks(
         self,
         items: List[Dict],
         categories: Dict[str, List[Dict]],
-        highlights: List[str],
+        highlights: List,  # Can be List[str] or List[Dict]
     ) -> List[Dict]:
         """Build Notion blocks for the report content."""
         blocks: List[Dict] = []
@@ -122,25 +130,36 @@ class DailyReportBuilder:
             blocks.append(_bullet(f"{cat}: {len(cat_items)}条"))
         blocks.append(_divider())
         
-        # Highlights section
+        # Highlights section with clickable links
         if highlights:
             blocks.append(_heading2("⭐ 今日要点"))
             for h in highlights:
-                blocks.append(_bullet(h))
+                if isinstance(h, dict):
+                    text = h.get("text", "")
+                    page_link = h.get("page_link", "")
+                    if page_link:
+                        blocks.append(_bullet_with_link(text, page_link))
+                    else:
+                        blocks.append(_bullet(text))
+                else:
+                    blocks.append(_bullet(h))
             blocks.append(_divider())
         
-        # Items by category
+        # Items by category with Notion page links
         for cat, cat_items in categories.items():
             blocks.append(_heading2(f"📁 {cat} ({len(cat_items)}条)"))
             for item in cat_items:
                 title = item.get("title", "无标题")
                 summary = item.get("summary", "")[:100]
                 url = item.get("url", "")
+                page_link = item.get("page_link", "")
                 
-                if url:
-                    blocks.append(_paragraph_link(f"📌 {title}", url))
+                # Prefer page_link for Notion internal linking, fall back to external URL
+                link = page_link or url
+                if link:
+                    blocks.append(_bullet_with_link(f"📌 {title}", link))
                 else:
-                    blocks.append(_paragraph(f"📌 {title}"))
+                    blocks.append(_bullet(f"📌 {title}"))
                 
                 if summary:
                     blocks.append(_paragraph(f"  {summary}"))

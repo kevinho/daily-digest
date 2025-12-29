@@ -184,19 +184,20 @@ class DailyReportBuilder:
             blocks.append(_heading2(f"📁 {cat} ({len(cat_items)}条)"))
             for item in cat_items:
                 title = item.get("title", "无标题")
-                summary = item.get("summary", "")[:100]
+                summary = item.get("summary", "")
                 url = item.get("url", "")
                 page_link = item.get("page_link", "")
+                
+                # Use AI summary as display text if available, otherwise use title
+                # Summary is more concise and AI-generated
+                display_text = summary[:100] if summary else title[:80]
                 
                 # Prefer page_link for Notion internal linking, fall back to external URL
                 link = page_link or url
                 if link:
-                    blocks.append(_bullet_with_link(f"📌 {title}", link))
+                    blocks.append(_bullet_with_link(f"📌 {display_text}", link))
                 else:
-                    blocks.append(_bullet(f"📌 {title}"))
-                
-                if summary:
-                    blocks.append(_paragraph(f"  {summary}"))
+                    blocks.append(_bullet(f"📌 {display_text}"))
             
             blocks.append(_divider())
         

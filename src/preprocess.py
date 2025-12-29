@@ -58,12 +58,16 @@ def _domain_from_url(url: Optional[str]) -> Optional[str]:
 
 
 def _is_meaningful_name(name: str, url: Optional[str]) -> bool:
-    """Treat empty/placeholder/domain-like names as missing."""
+    """Treat empty/placeholder/domain-like/auto-generated names as missing."""
     cleaned = (name or "").strip()
     if not cleaned:
         return False
     lowered = cleaned.lower()
-    if lowered in {"untitled", "new page", "bookmark", "default"}:
+    # Common placeholder names
+    if lowered in {"untitled", "new page", "bookmark", "default", "image clip"}:
+        return False
+    # Auto-generated names that should be replaced with proper NOTE-xxx format
+    if lowered.startswith("image-"):
         return False
     # names that are just the domain or url are not meaningful
     domain = _domain_from_url(url)
@@ -73,17 +77,20 @@ def _is_meaningful_name(name: str, url: Optional[str]) -> bool:
 
 
 def _process_url_resource(page: Dict[str, Any], notion: Any, cdp_url: str) -> Dict[str, Any]:
-    """Process URL_RESOURCE: backfill title from URL if needed."""
+    """Process URL_RESOURCE: backfill title from URL if needed, set ItemType."""
     page_id = page.get("id", "")
     name = (page.get("title") or "").strip()
     url = page.get("url")
     raw_content = (page.get("raw_content") or "").strip()
     attachments: List[str] = page.get("attachments") or []
 
+    # Always set ItemType
+    notion.set_item_type(page_id, "url_resource")
+
     has_name = _is_meaningful_name(name, url)
 
     if has_name:
-        # Already has meaningful name, skip
+        # Already has meaningful name, skip title backfill
         return {"action": "skip", "item_type": "url_resource"}
 
     # Need to backfill title
@@ -111,14 +118,17 @@ def _process_url_resource(page: Dict[str, Any], notion: Any, cdp_url: str) -> Di
 
 
 def _process_note_content(page: Dict[str, Any], notion: Any, sequence: int) -> Dict[str, Any]:
-    """Process NOTE_CONTENT: generate name and mark ready."""
+    """Process NOTE_CONTENT: generate name, set ItemType, and mark ready."""
     page_id = page.get("id", "")
     name = (page.get("title") or "").strip()
+
+    # Always set ItemType
+    notion.set_item_type(page_id, "note_content")
 
     has_name = _is_meaningful_name(name, None)
 
     if has_name:
-        # Already has name, just mark ready
+        # Already has meaningful name, just mark ready
         notion.mark_as_done(page_id, "Content note", status=notion.status.ready)
         return {"action": "ready", "item_type": "note_content"}
 
@@ -130,8 +140,10 @@ def _process_note_content(page: Dict[str, Any], notion: Any, sequence: int) -> D
 
 
 def _process_empty_invalid(page: Dict[str, Any], notion: Any, reason: str) -> Dict[str, Any]:
-    """Process EMPTY_INVALID: mark as Error."""
+    """Process EMPTY_INVALID: set ItemType and mark as Error."""
     page_id = page.get("id", "")
+    # Always set ItemType
+    notion.set_item_type(page_id, "empty_invalid")
     notion.mark_as_error(page_id, reason)
     return {"action": "error", "reason": reason, "item_type": "empty_invalid"}
 

@@ -17,6 +17,7 @@ class StubNotion:
         self.titles = {}
         self.errors = {}
         self.done = {}
+        self.item_types = {}  # Track ItemType assignments
         self.status = MockStatus()
         self._has_blocks = False  # Default: no content blocks
 
@@ -28,6 +29,10 @@ class StubNotion:
 
     def mark_as_done(self, page_id: str, summary: str, status: str = None) -> None:
         self.done[page_id] = {"summary": summary, "status": status}
+
+    def set_item_type(self, page_id: str, item_type: str) -> None:
+        """Track ItemType assignments."""
+        self.item_types[page_id] = item_type
 
     def has_page_blocks(self, page_id: str) -> bool:
         """Return configurable result for content block check."""
@@ -286,3 +291,74 @@ def test_tweet_title_processing(monkeypatch):
     assert result["action"] == "backfilled"
     assert result["item_type"] == "url_resource"
     assert notion.titles["t1"]["title"] == title
+
+
+# ============================================================
+# ItemType Field Tests
+# ============================================================
+
+def test_url_resource_sets_item_type(monkeypatch):
+    """URL_RESOURCE should set ItemType field."""
+    notion = StubNotion()
+    monkeypatch.setattr(preprocess, "fetch_title_from_url", lambda url, cdp: "Title")
+    
+    page = {"id": "it1", "title": "", "url": "http://example.com", "attachments": [], "raw_content": ""}
+    preprocess.preprocess_item(page, notion, "cdp")
+    
+    assert notion.item_types.get("it1") == "url_resource"
+
+
+def test_note_content_sets_item_type():
+    """NOTE_CONTENT should set ItemType field."""
+    notion = StubNotion()
+    notion._has_blocks = True
+    
+    page = {"id": "it2", "title": "", "url": None, "attachments": [], "raw_content": ""}
+    preprocess.preprocess_item(page, notion, "cdp")
+    
+    assert notion.item_types.get("it2") == "note_content"
+
+
+def test_empty_invalid_sets_item_type():
+    """EMPTY_INVALID should set ItemType field."""
+    notion = StubNotion()
+    notion._has_blocks = False
+    
+    page = {"id": "it3", "title": "", "url": None, "attachments": [], "raw_content": ""}
+    preprocess.preprocess_item(page, notion, "cdp")
+    
+    assert notion.item_types.get("it3") == "empty_invalid"
+
+
+# ============================================================
+# Image-xxx Name Fix Tests
+# ============================================================
+
+def test_image_name_gets_renamed_to_note():
+    """NOTE_CONTENT with image-xxx name should be renamed to NOTE-xxx."""
+    notion = StubNotion()
+    notion._has_blocks = True
+    
+    page = {"id": "img1", "title": "Image-20251229-1234", "url": None, "attachments": [], "raw_content": ""}
+    result = preprocess.preprocess_item(page, notion, "cdp")
+    
+    assert result["action"] == "ready"
+    assert result["item_type"] == "note_content"
+    # Should have a new NOTE-xxx title
+    assert "img1" in notion.titles
+    assert notion.titles["img1"]["title"].startswith("NOTE-")
+
+
+def test_image_clip_name_gets_renamed_to_note():
+    """NOTE_CONTENT with 'Image Clip' name should be renamed to NOTE-xxx."""
+    notion = StubNotion()
+    notion._has_blocks = True
+    
+    page = {"id": "img2", "title": "Image Clip", "url": None, "attachments": [], "raw_content": ""}
+    result = preprocess.preprocess_item(page, notion, "cdp")
+    
+    assert result["action"] == "ready"
+    assert result["item_type"] == "note_content"
+    # Should have a new NOTE-xxx title
+    assert "img2" in notion.titles
+    assert notion.titles["img2"]["title"].startswith("NOTE-")

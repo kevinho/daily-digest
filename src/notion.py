@@ -34,6 +34,7 @@ class PropertyNames:
     tags: str = "Tags"
     rule_version: str = "Rule Version"
     prompt_version: str = "Prompt Version"
+    item_type: str = "ItemType"  # Select: url_resource, note_content, empty_invalid
 
 
 class NotionManager:
@@ -69,6 +70,7 @@ class NotionManager:
             tags=get_env("NOTION_PROP_TAGS", PropertyNames.tags),
             rule_version=get_env("NOTION_PROP_RULE_VERSION", PropertyNames.rule_version),
             prompt_version=get_env("NOTION_PROP_PROMPT_VERSION", PropertyNames.prompt_version),
+            item_type=get_env("NOTION_PROP_ITEM_TYPE", PropertyNames.item_type),
         )
 
     def has_page_blocks(self, page_id: str) -> bool:
@@ -434,6 +436,19 @@ class NotionManager:
             self.prop.title: {"title": [{"text": {"content": title[:1900]}}]},
         }
         props = self._with_reason(note, props)
+        self.client.pages.update(page_id=page_id, properties=props)
+
+    def set_item_type(self, page_id: str, item_type: str) -> None:
+        """
+        Set the ItemType select field.
+        
+        Args:
+            page_id: Notion page ID
+            item_type: One of 'url_resource', 'note_content', 'empty_invalid'
+        """
+        props = {
+            self.prop.item_type: {"select": {"name": item_type}},
+        }
         self.client.pages.update(page_id=page_id, properties=props)
 
     def add_file_to_item(

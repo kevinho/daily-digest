@@ -38,10 +38,6 @@ def _is_meaningful_name(name: str, url: Optional[str]) -> bool:
     cleaned = (name or "").strip()
     if not cleaned:
         return False
-    if len(cleaned) > 120:
-        return False
-    if len(cleaned.split()) > 15:
-        return False
     lowered = cleaned.lower()
     if lowered in {"untitled", "new page", "bookmark", "default"}:
         return False

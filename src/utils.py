@@ -45,6 +45,12 @@ def _parse_bool(val: Optional[str], default: bool) -> bool:
     return val.lower() in ("1", "true", "yes", "on")
 
 
+def get_int(key: str, default: int) -> int:
+    try:
+        return int(os.getenv(key, default))
+    except Exception:
+        return default
+
 def _parse_viewport(val: Optional[str]) -> Optional[dict]:
     if not val:
         return None

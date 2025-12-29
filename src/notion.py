@@ -24,7 +24,8 @@ class PropertyNames:
     url: str = "URL"
     summary: str = "Summary"
     raw_content: str = "Raw Content"
-    reason: str = "Reason"  # optional audit/notes property if present
+    reason: str = "Reason"  # audit/notes
+    source: str = "Source"
     confidence: str = "Confidence"
     sensitivity: str = "Sensitivity"
     files: str = "Files"
@@ -59,6 +60,7 @@ class NotionManager:
             summary=get_env("NOTION_PROP_SUMMARY", PropertyNames.summary),
             raw_content=get_env("NOTION_PROP_RAW_CONTENT", PropertyNames.raw_content),
             reason=get_env("NOTION_PROP_REASON", PropertyNames.reason),
+            source=get_env("NOTION_PROP_SOURCE", PropertyNames.source),
             confidence=get_env("NOTION_PROP_CONFIDENCE", PropertyNames.confidence),
             sensitivity=get_env("NOTION_PROP_SENSITIVITY", PropertyNames.sensitivity),
             files=get_env("NOTION_PROP_FILES", PropertyNames.files),
@@ -100,6 +102,7 @@ class NotionManager:
         title_prop = props.get(self.prop.title, {})
         summary_prop = props.get(self.prop.summary, {})
         raw_prop = props.get(self.prop.raw_content, {})
+        source_prop = props.get(self.prop.source, {})
         attachments: List[str] = []
         if isinstance(files_prop, dict) and "files" in files_prop:
             for f in files_prop.get("files", []):
@@ -123,6 +126,11 @@ class NotionManager:
             ritems = raw_prop.get("rich_text", [])
             if ritems:
                 raw_text = ritems[0].get("plain_text", "") or ritems[0].get("text", {}).get("content", "")
+        source_value = ""
+        if isinstance(source_prop, dict):
+            sitems = source_prop.get("rich_text", [])
+            if sitems:
+                source_value = sitems[0].get("plain_text", "") or sitems[0].get("text", {}).get("content", "")
 
         tags_prop = props.get(self.prop.tags, {})
         tags: List[str] = []
@@ -131,6 +139,12 @@ class NotionManager:
                 name = t.get("name")
                 if name:
                     tags.append(name)
+
+        source_value = ""
+        if isinstance(source_prop, dict):
+            sitems = source_prop.get("rich_text", [])
+            if sitems:
+                source_value = sitems[0].get("plain_text", "") or sitems[0].get("text", {}).get("content", "")
 
         status_prop = props.get(self.prop.status, {})
         status_name = None
@@ -145,6 +159,7 @@ class NotionManager:
             "summary": summary_text,
             "tags": tags,
             "raw_content": raw_text,
+            "source": source_value,
             "raw": page,
         }
 
@@ -355,6 +370,7 @@ class NotionManager:
         prompt_version: str,
         raw_content: Optional[str] = None,
         canonical_url: Optional[str] = None,
+        source: Optional[str] = None,
     ) -> None:
         props: Dict[str, Any] = {
             self.prop.tags: {"multi_select": [{"name": t} for t in tags]},
@@ -367,6 +383,8 @@ class NotionManager:
             props[self.prop.raw_content] = {"rich_text": [{"text": {"content": raw_content[:1900]}}]}
         if canonical_url:
             props[self.prop.canonical_url] = {"url": canonical_url}
+        if source:
+            props[self.prop.source] = {"rich_text": [{"text": {"content": source[:1900]}}]}
         self.client.pages.update(page_id=page_id, properties=props)
 
     def set_title(self, page_id: str, title: str, note: Optional[str] = None) -> None:

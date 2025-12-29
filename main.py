@@ -10,7 +10,7 @@ from src.llm import classify, generate_digest
 from src.notion import NotionManager
 from src.digest import build_digest
 from src.preprocess import preprocess_batch
-from src.utils import configure_logging, get_env, get_timezone
+from src.utils import configure_logging, get_env, get_timezone, normalize_tweet_url
 
 
 def is_attachment_unprocessed(url: str) -> bool:
@@ -18,40 +18,49 @@ def is_attachment_unprocessed(url: str) -> bool:
     return lowered.endswith((".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp"))
 
 
-def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
+def process_item(page: dict, notion: NotionManager, cdp_url: str) -> str:
     page_id = page.get("id", "")
     url = page.get("url")
+    source = page.get("source") or "manual"
     attachments = page.get("attachments", [])
     if not url:
         if attachments:
             notion.mark_unprocessed(page_id, "Attachment stored; no URL; OCR out of scope; excluded from digests")
+            return "unprocessed"
         else:
             notion.mark_as_error(page_id, "missing url")
-        return
+            return "error"
 
-    # Dedupe by canonical URL
     from src.dedupe import canonical_url
 
-    canonical = canonical_url(url)
+    tweet_norm = normalize_tweet_url(url)
+    if tweet_norm is None and ("twitter.com" in url.lower() or "x.com" in url.lower()):
+        notion.mark_as_error(page_id, "invalid tweet url")
+        return "error"
+    target_url = tweet_norm or url
+    canonical = canonical_url(target_url)
     existing = notion.find_by_canonical(canonical)
     if existing and existing.get("id") != page_id:
+        if existing.get("status") in (notion.status.ready, notion.status.pending):
+            notion.set_duplicate_of(page_id, existing["id"], f"Duplicate of ready/pending {existing['id']}")
+            return "duplicate"
         notion.set_duplicate_of(page_id, existing["id"], f"Duplicate of {existing['id']}")
-        return
+        return "duplicate"
 
     # Attachment without OCR support
     if is_attachment_unprocessed(url):
         notion.mark_unprocessed(page_id, "Attachment stored; OCR out of scope; excluded from digests")
-        return
+        return "unprocessed"
 
     try:
-        text = asyncio.run(fetch_page_content(url, cdp_url))
-    except RuntimeError as exc:
+        text = asyncio.run(fetch_page_content(target_url, cdp_url))
+    except Exception as exc:  # catch RetryError/RuntimeError
         notion.mark_as_error(page_id, f"fetch failed: {exc}")
-        return
+        return "error"
 
     if not text:
         notion.mark_as_error(page_id, "no content")
-        return
+        return "error"
 
     # Classification
     classification = classify(text)
@@ -70,6 +79,7 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
         prompt_version=prompt_version,
         raw_content=text,
         canonical_url=canonical,
+        source=source,
     )
 
     summary = generate_digest(text)
@@ -80,9 +90,13 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
         summary_text = (summary_text + "\n" + insights).strip()
     if confidence < threshold:
         notion.mark_as_done(page_id, summary_text, status=notion.status.pending)
-        return
+        return "success"
 
-    notion.mark_as_done(page_id, summary_text)
+    note_status = None
+    if source == "plugin":
+        note_status = notion.status.ready
+    notion.mark_as_done(page_id, summary_text, status=note_status)
+    return "success"
 
 
 def run_preprocess(notion: NotionManager, cdp_url: str, scope: str) -> None:
@@ -105,8 +119,11 @@ def main(digest_window: Optional[str] = None, preprocess_only: bool = False) -> 
             return
 
     pending = notion.get_pending_tasks()
+    counts = {"success": 0, "error": 0, "duplicate": 0, "unprocessed": 0}
     for item in pending:
-        process_item(item, notion, cdp_url)
+        result = process_item(item, notion, cdp_url)
+        if result in counts:
+            counts[result] += 1
     if digest_window:
         logging.info("Manual digest trigger requested for window=%s", digest_window)
         ready = notion.fetch_ready_for_digest(since=None, until=None, include_private=False)
@@ -120,6 +137,7 @@ def main(digest_window: Optional[str] = None, preprocess_only: bool = False) -> 
             logging.info("Digest page created: %s", page_id)
         else:
             logging.warning("NOTION_DIGEST_PARENT_ID not set; digest page not created")
+    logging.info("Ingest results: %s", counts)
 
 
 if __name__ == "__main__":

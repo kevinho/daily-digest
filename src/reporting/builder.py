@@ -53,18 +53,23 @@ class DailyReportBuilder:
         # Extract source IDs
         source_ids = [item.get("id") for item in items if item.get("id")]
         
-        # Always extract highlights with page links for content blocks
-        highlights_with_links = self._extract_highlights(items)
+        # Extract page links from items for linking
+        item_links = self._extract_highlights(items)  # Contains page_link info
         
         # Generate overview using AI if available
         if generate_overview_fn:
             overview_data = generate_overview_fn(items)
             overview = overview_data.get("overview", "")
-            # Use AI highlights for metadata, but use linked highlights for display
-            highlights = overview_data.get("highlights", [h.get("text", "") for h in highlights_with_links])
+            ai_highlights = overview_data.get("highlights", [])
+            
+            # Combine AI text with source item links
+            # AI text is more concise, but we want it clickable
+            highlights_with_links = self._merge_ai_highlights_with_links(ai_highlights, item_links)
+            highlights = ai_highlights  # For metadata
         else:
-            # Fallback: simple count-based overview
+            # Fallback: use item titles with links
             overview = self._fallback_overview(items, categories)
+            highlights_with_links = item_links
             highlights = [h.get("text", "") for h in highlights_with_links]
         
         # Build Notion content blocks with linked highlights
@@ -114,6 +119,35 @@ class DailyReportBuilder:
                     "url": item.get("url", ""),
                 })
         return highlights
+    
+    def _merge_ai_highlights_with_links(
+        self,
+        ai_highlights: List[str],
+        item_links: List[Dict],
+    ) -> List[Dict]:
+        """
+        Merge AI-generated highlight text with source item links.
+        
+        AI provides concise summaries, item_links provide page URLs.
+        Combine them by index order (AI highlight i -> item i's link).
+        """
+        merged = []
+        for i, ai_text in enumerate(ai_highlights):
+            if i < len(item_links):
+                # Use AI text with item's page link
+                merged.append({
+                    "text": ai_text,
+                    "page_link": item_links[i].get("page_link", ""),
+                    "url": item_links[i].get("url", ""),
+                })
+            else:
+                # No matching item, just use AI text without link
+                merged.append({
+                    "text": ai_text,
+                    "page_link": "",
+                    "url": "",
+                })
+        return merged
     
     def _build_content_blocks(
         self,

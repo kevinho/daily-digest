@@ -210,36 +210,66 @@ class WeeklyReportBuilder:
         count = len(daily_reports)
         return f"本周共{count}天有内容记录。"
     
-    def _extract_trends(self, daily_reports: List[Dict]) -> List[str]:
-        """Extract trends from daily reports."""
-        # Aggregate highlights from all daily reports
-        all_highlights = []
+    def _extract_trends(self, daily_reports: List[Dict]) -> List[Dict]:
+        """Extract trends from daily reports with source info."""
+        # Aggregate highlights with source tracking
+        all_trends = []
         for report in daily_reports:
             highlights = report.get("highlights") or []
-            all_highlights.extend(highlights)
-        return all_highlights[:5]
+            report_url = report.get("url", "")
+            report_date = report.get("date", "")
+            for h in highlights:
+                all_trends.append({
+                    "text": h,
+                    "page_link": report_url,
+                    "date": report_date,
+                })
+        return all_trends[:5]
     
     def _build_content_blocks(
         self,
         daily_reports: List[Dict],
-        highlights: List[str],
+        highlights: List,  # Can be List[str] or List[Dict]
     ) -> List[Dict]:
         """Build Notion blocks for weekly report."""
         blocks: List[Dict] = []
         
-        # Summary section
+        # Daily reports section with clickable links and summaries
         blocks.append(_heading2(f"📅 本周概览 ({len(daily_reports)}天)"))
         for report in daily_reports:
             title = report.get("title", "")
             date_str = report.get("date", "")
-            blocks.append(_bullet(f"{date_str}: {title}"))
+            summary = report.get("summary", "")[:200]  # ~200 chars
+            page_url = report.get("url", "")
+            
+            # Daily report title as callout with link
+            blocks.append(_callout(f"{date_str}: {title}", "📋", page_url))
+            
+            # Summary paragraph (indented feeling)
+            if summary:
+                blocks.append(_paragraph(f"  {summary}"))
+            
+            # Add spacing
+            blocks.append(_paragraph(""))
+        
         blocks.append(_divider())
         
-        # Trends section
+        # Trends section with page links
         if highlights:
             blocks.append(_heading2("📈 本周趋势"))
             for h in highlights:
-                blocks.append(_bullet(h))
+                if isinstance(h, dict):
+                    # New format with source info
+                    text = h.get("text", "")
+                    page_link = h.get("page_link", "")
+                    date_str = h.get("date", "")
+                    if page_link:
+                        blocks.append(_bullet_with_link(f"{text} ({date_str})", page_link))
+                    else:
+                        blocks.append(_bullet(f"{text} ({date_str})"))
+                else:
+                    # Old format: just string
+                    blocks.append(_bullet(h))
             blocks.append(_divider())
         
         return blocks
@@ -390,4 +420,37 @@ def _bullet(text: str) -> Dict:
 def _divider() -> Dict:
     """Create a divider block."""
     return {"object": "block", "type": "divider", "divider": {}}
+
+
+def _callout(text: str, icon: str = "📌", url: str = None) -> Dict:
+    """Create a callout block with optional link."""
+    rich_text = [
+        {
+            "type": "text",
+            "text": {"content": text[:2000], "link": {"url": url} if url else None},
+            "annotations": {"bold": True},
+        }
+    ]
+    return {
+        "object": "block",
+        "type": "callout",
+        "callout": {
+            "rich_text": rich_text,
+            "icon": {"type": "emoji", "emoji": icon},
+            "color": "gray_background",
+        },
+    }
+
+
+def _bullet_with_link(text: str, url: str) -> Dict:
+    """Create a bulleted list item with clickable link."""
+    return {
+        "object": "block",
+        "type": "bulleted_list_item",
+        "bulleted_list_item": {
+            "rich_text": [
+                {"type": "text", "text": {"content": text[:2000], "link": {"url": url}}}
+            ]
+        },
+    }
 

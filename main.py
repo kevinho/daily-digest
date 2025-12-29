@@ -17,7 +17,7 @@ def is_attachment_unprocessed(url: str) -> bool:
     return lowered.endswith((".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp"))
 
 
-def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
+def process_item(page: dict, notion: NotionManager, cdp_url: str) -> str:
     page_id = page.get("id", "")
     url = page.get("url")
     source = page.get("source") or "manual"
@@ -25,40 +25,41 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
     if not url:
         if attachments:
             notion.mark_unprocessed(page_id, "Attachment stored; no URL; OCR out of scope; excluded from digests")
+            return "unprocessed"
         else:
             notion.mark_as_error(page_id, "missing url")
-        return
+            return "error"
 
     from src.dedupe import canonical_url
 
     tweet_norm = normalize_tweet_url(url)
     if tweet_norm is None and ("twitter.com" in url.lower() or "x.com" in url.lower()):
         notion.mark_as_error(page_id, "invalid tweet url")
-        return
+        return "error"
     target_url = tweet_norm or url
     canonical = canonical_url(target_url)
     existing = notion.find_by_canonical(canonical)
     if existing and existing.get("id") != page_id:
         if existing.get("status") in (notion.status.ready, notion.status.pending):
             notion.set_duplicate_of(page_id, existing["id"], f"Duplicate of ready/pending {existing['id']}")
-            return
+            return "duplicate"
         notion.set_duplicate_of(page_id, existing["id"], f"Duplicate of {existing['id']}")
-        return
+        return "duplicate"
 
     # Attachment without OCR support
     if is_attachment_unprocessed(url):
         notion.mark_unprocessed(page_id, "Attachment stored; OCR out of scope; excluded from digests")
-        return
+        return "unprocessed"
 
     try:
         text = asyncio.run(fetch_page_content(target_url, cdp_url))
     except RuntimeError as exc:
         notion.mark_as_error(page_id, f"fetch failed: {exc}")
-        return
+        return "error"
 
     if not text:
         notion.mark_as_error(page_id, "no content")
-        return
+        return "error"
 
     # Classification
     classification = classify(text)
@@ -94,6 +95,7 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
     if source == "plugin":
         note_status = notion.status.ready
     notion.mark_as_done(page_id, summary_text, status=note_status)
+    return "success"
 
 
 def main(digest_window: Optional[str] = None) -> None:
@@ -102,8 +104,11 @@ def main(digest_window: Optional[str] = None) -> None:
     cdp_url = get_env("CHROME_REMOTE_URL", "http://localhost:9222")
     notion = NotionManager()
     pending = notion.get_pending_tasks()
+    counts = {"success": 0, "error": 0, "duplicate": 0, "unprocessed": 0}
     for item in pending:
-        process_item(item, notion, cdp_url)
+        result = process_item(item, notion, cdp_url)
+        if result in counts:
+            counts[result] += 1
     if digest_window:
         logging.info("Manual digest trigger requested for window=%s", digest_window)
         ready = notion.fetch_ready_for_digest(since=None, until=None, include_private=False)
@@ -117,6 +122,7 @@ def main(digest_window: Optional[str] = None) -> None:
             logging.info("Digest page created: %s", page_id)
         else:
             logging.warning("NOTION_DIGEST_PARENT_ID not set; digest page not created")
+    logging.info("Ingest results: %s", counts)
 
 
 if __name__ == "__main__":

@@ -120,8 +120,9 @@ def test_duplicate_ready_skips(monkeypatch):
     notion = StubNotion()
     notion._find_return = {"id": "ready1", "status": notion.status.ready}
     page = {"id": "4", "url": "https://x.com/user/status/999", "attachments": []}
-    main.process_item(page, notion, "http://localhost:9222")
+    res = main.process_item(page, notion, "http://localhost:9222")
     assert notion.duplicates["4"] == "ready1"
+    assert res == "duplicate"
     assert "4" not in notion.classifications
 
 
@@ -136,8 +137,9 @@ def test_retry_after_block(monkeypatch):
 
     monkeypatch.setattr("main.fetch_page_content", blocked)
     page = {"id": "5", "url": "https://x.com/user/status/100", "attachments": []}
-    main.process_item(page, notion, "http://localhost:9222")
+    res_block = main.process_item(page, notion, "http://localhost:9222")
     assert "blocked" in notion.errors["5"]
+    assert res_block == "error"
 
     monkeypatch.setattr("main.fetch_page_content", ok)
     monkeypatch.setattr(
@@ -151,6 +153,7 @@ def test_retry_after_block(monkeypatch):
         },
     )
     monkeypatch.setattr("main.generate_digest", lambda text: {"tldr": "ok", "insights": ""})
-    main.process_item(page, notion, "http://localhost:9222")
+    res_ok = main.process_item(page, notion, "http://localhost:9222")
+    assert res_ok == "success"
     assert notion.classifications["5"]["raw_content"] == "hi"
 

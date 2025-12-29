@@ -100,6 +100,11 @@ class DigestService:
             generate_overview_fn=self._get_daily_overview_fn(),
         )
         
+        # Log source IDs being linked
+        logger.info(f"Daily report will link {len(report_data.source_ids)} source items")
+        if report_data.source_ids:
+            logger.debug(f"Source item IDs: {report_data.source_ids[:5]}...")
+        
         # Create in Reporting DB
         page_id = self.reporting.create_report(
             report_data=report_data,

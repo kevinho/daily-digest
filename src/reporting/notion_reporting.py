@@ -183,11 +183,15 @@ class ReportingDBManager:
         
         # Add relations
         if source_item_ids:
+            logger.info(f"Setting Source Items relation with {len(source_item_ids)} items: {source_item_ids[:3]}...")
             properties[self.prop_source_items] = {
                 "relation": [{"id": id_} for id_ in source_item_ids]
             }
+        else:
+            logger.warning("No source_item_ids provided for report")
         
         if source_report_ids:
+            logger.info(f"Setting Source Reports relation with {len(source_report_ids)} reports: {source_report_ids[:3]}...")
             properties[self.prop_source_reports] = {
                 "relation": [{"id": id_} for id_ in source_report_ids]
             }

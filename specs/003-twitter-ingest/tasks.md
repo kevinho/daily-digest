@@ -38,8 +38,8 @@
 
 ## Phase 5: User Story 3 - 幂等与重复防护 (Priority: P2)
 
-- [ ] T040 [US3] 在 `main.py` 增加 tweet Canonical URL 去重/幂等策略：已 ready/pending 的条目跳过，不重复写入。
-- [ ] T041 [P] [US3] 在 `tests/test_twitter_ingest.py` 添加用例：重复运行不重复写入；先失败后解封再成功。
+- [x] T040 [US3] 在 `main.py` 增加 tweet Canonical URL 去重/幂等策略：已 ready/pending 的条目跳过，不重复写入。
+- [x] T041 [P] [US3] 在 `tests/test_twitter_ingest.py` 添加用例：重复运行不重复写入；先失败后解封再成功。
 
 ---
 

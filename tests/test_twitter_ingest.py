@@ -12,6 +12,7 @@ class StubNotion:
         self.classifications = {}
         self.done = {}
         self.duplicates = {}
+        self.props = {}
 
         class Status:
             ready = "ready"
@@ -44,6 +45,7 @@ class StubNotion:
         prompt_version,
         raw_content=None,
         canonical_url=None,
+        source=None,
     ):
         self.classifications[page_id] = {
             "tags": tags,
@@ -53,6 +55,7 @@ class StubNotion:
             "prompt_version": prompt_version,
             "raw_content": raw_content,
             "canonical_url": canonical_url,
+            "source": source,
         }
 
     def mark_as_done(self, page_id, summary, status=None):
@@ -88,6 +91,7 @@ def test_twitter_success(monkeypatch):
 
     assert notion.errors == {}
     assert notion.classifications["1"]["raw_content"] == "Hello tweet"
+    assert notion.classifications["1"]["source"] == "manual"
     assert notion.done["1"]["status"] == notion.status.ready
 
 

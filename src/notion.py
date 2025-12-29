@@ -24,6 +24,7 @@ class PropertyNames:
     url: str = "URL"
     summary: str = "Summary"
     raw_content: str = "Raw Content"
+    source: str = "Source"
     confidence: str = "Confidence"
     sensitivity: str = "Sensitivity"
     files: str = "Files"
@@ -57,6 +58,7 @@ class NotionManager:
             url=get_env("NOTION_PROP_URL", PropertyNames.url),
             summary=get_env("NOTION_PROP_SUMMARY", PropertyNames.summary),
             raw_content=get_env("NOTION_PROP_RAW_CONTENT", PropertyNames.raw_content),
+            source=get_env("NOTION_PROP_SOURCE", PropertyNames.source),
             confidence=get_env("NOTION_PROP_CONFIDENCE", PropertyNames.confidence),
             sensitivity=get_env("NOTION_PROP_SENSITIVITY", PropertyNames.sensitivity),
             files=get_env("NOTION_PROP_FILES", PropertyNames.files),
@@ -97,6 +99,7 @@ class NotionManager:
         files_prop = props.get(self.prop.files, {})
         title_prop = props.get(self.prop.title, {})
         summary_prop = props.get(self.prop.summary, {})
+        source_prop = props.get(self.prop.source, {})
         attachments: List[str] = []
         if isinstance(files_prop, dict) and "files" in files_prop:
             for f in files_prop.get("files", []):
@@ -124,6 +127,12 @@ class NotionManager:
                 if name:
                     tags.append(name)
 
+        source_value = ""
+        if isinstance(source_prop, dict):
+            sitems = source_prop.get("rich_text", [])
+            if sitems:
+                source_value = sitems[0].get("plain_text", "") or sitems[0].get("text", {}).get("content", "")
+
         status_prop = props.get(self.prop.status, {})
         status_name = None
         if "status" in status_prop and isinstance(status_prop["status"], dict):
@@ -136,6 +145,7 @@ class NotionManager:
              "title": title_text,
              "summary": summary_text,
              "tags": tags,
+            "source": source_value,
             "raw": page,
         }
 
@@ -320,6 +330,7 @@ class NotionManager:
         prompt_version: str,
         raw_content: Optional[str] = None,
         canonical_url: Optional[str] = None,
+        source: Optional[str] = None,
     ) -> None:
         props: Dict[str, Any] = {
             self.prop.tags: {"multi_select": [{"name": t} for t in tags]},
@@ -332,4 +343,6 @@ class NotionManager:
             props[self.prop.raw_content] = {"rich_text": [{"text": {"content": raw_content[:1900]}}]}
         if canonical_url:
             props[self.prop.canonical_url] = {"url": canonical_url}
+        if source:
+            props[self.prop.source] = {"rich_text": [{"text": {"content": source[:1900]}}]}
         self.client.pages.update(page_id=page_id, properties=props)

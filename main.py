@@ -20,6 +20,7 @@ def is_attachment_unprocessed(url: str) -> bool:
 def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
     page_id = page.get("id", "")
     url = page.get("url")
+    source = page.get("source") or "manual"
     attachments = page.get("attachments", [])
     if not url:
         if attachments:
@@ -73,6 +74,7 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
         prompt_version=prompt_version,
         raw_content=text,
         canonical_url=canonical,
+        source=source,
     )
 
     summary = generate_digest(text)
@@ -85,7 +87,10 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
         notion.mark_as_done(page_id, summary_text, status=notion.status.pending)
         return
 
-    notion.mark_as_done(page_id, summary_text)
+    note_status = None
+    if source == "plugin":
+        note_status = notion.status.ready
+    notion.mark_as_done(page_id, summary_text, status=note_status)
 
 
 def main(digest_window: Optional[str] = None) -> None:

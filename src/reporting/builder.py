@@ -85,15 +85,29 @@ class DailyReportBuilder:
         )
     
     def _group_by_tags(self, items: List[Dict]) -> Dict[str, List[Dict]]:
-        """Group items by their tags."""
+        """Group items by their tags, with fallback to content_type."""
         categories: Dict[str, List[Dict]] = {}
         
         for item in items:
             tags = item.get("tags") or []
-            if not tags:
-                tags = ["未分类"]
             
-            for tag in tags:
+            # Filter out generic tags like "general"
+            meaningful_tags = [t for t in tags if t.lower() not in ("general", "未分类", "")]
+            
+            if not meaningful_tags:
+                # Fallback: use content_type or item_type for grouping
+                content_type = item.get("content_type") or ""
+                item_type = item.get("item_type") or ""
+                
+                if content_type and content_type.upper() != "HTML":
+                    # Group non-HTML content by type (PDF, Image, etc.)
+                    meaningful_tags = [f"📄 {content_type.upper()}"]
+                elif item_type and item_type.upper() == "NOTE_CONTENT":
+                    meaningful_tags = ["📝 笔记"]
+                else:
+                    meaningful_tags = ["🔗 网页"]
+            
+            for tag in meaningful_tags:
                 if tag not in categories:
                     categories[tag] = []
                 categories[tag].append(item)

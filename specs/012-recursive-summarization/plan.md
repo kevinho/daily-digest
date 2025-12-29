@@ -215,8 +215,9 @@ class ReportingDBManager:
 ### 6. Environment Variables
 
 ```
-# Reporting DB
+# Reporting DB (已配置)
 NOTION_REPORTING_DB_ID=xxx    # Reporting database ID
+NOTION_REPORTING_DS_ID=xxx    # Reporting datasource ID (for synced DB)
 
 # Timezone
 DIGEST_TIMEZONE=Asia/Shanghai

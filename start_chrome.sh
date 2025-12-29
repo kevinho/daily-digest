@@ -2,7 +2,7 @@
 set -euo pipefail
 
 CHROME_BIN=${CHROME_BIN:-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"}
-USER_DATA_DIR=${USER_DATA_DIR:-"/Users/hechangbin/Library/Application Support/Google/Chrome"}
+USER_DATA_DIR=$HOME/.chrome-remote-profile
 DEBUG_PORT=${DEBUG_PORT:-9222}
 
 "$CHROME_BIN" \

@@ -4,9 +4,6 @@ import asyncio
 import logging
 from datetime import datetime
 from typing import Optional
-from urllib.parse import urlparse
-
-import httpx
 
 from src.browser import fetch_page_content
 from src.llm import classify, generate_digest
@@ -18,34 +15,6 @@ from src.utils import configure_logging, get_env, get_timezone
 def is_attachment_unprocessed(url: str) -> bool:
     lowered = url.lower()
     return lowered.endswith((".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp"))
-
-
-def extract_tweet_id(url: str) -> Optional[str]:
-    try:
-        path = urlparse(url).path
-    except Exception:
-        return None
-    parts = path.split("/")
-    for p in reversed(parts):
-        if p.isdigit():
-            return p
-    return None
-
-
-def fetch_tweet_text(url: str) -> Optional[str]:
-    tweet_id = extract_tweet_id(url)
-    if not tweet_id:
-        return None
-    api_url = f"https://cdn.syndication.twimg.com/tweet?id={tweet_id}"
-    try:
-        resp = httpx.get(api_url, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        text = data.get("text") or data.get("full_text")
-        return text
-    except Exception as exc:
-        logging.warning("Tweet API fetch failed for %s: %s", tweet_id, exc)
-        return None
 
 
 def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
@@ -82,23 +51,6 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> None:
     if not text:
         notion.mark_as_error(page_id, "no content")
         return
-
-    blocked_markers = [
-        "javascript is disabled",
-        "enable javascript",
-        "continue using x.com",
-        "继续使用 x.com",
-    ]
-    if any(marker in text.lower() for marker in blocked_markers):
-        tweet_text = None
-        host = urlparse(url).netloc.lower()
-        if "x.com" in host or "twitter.com" in host:
-            tweet_text = fetch_tweet_text(url)
-        if tweet_text:
-            text = tweet_text
-        else:
-            notion.mark_as_error(page_id, "fetch blocked: JS/anti-bot page returned; retry in logged-in browser")
-            return
 
     # Classification
     classification = classify(text)

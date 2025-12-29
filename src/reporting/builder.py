@@ -186,16 +186,21 @@ class WeeklyReportBuilder:
         
         source_ids = [r.get("id") for r in daily_reports if r.get("id")]
         
-        # Generate overview
+        # Always extract trends with page links from daily reports
+        trends_with_links = self._extract_trends(daily_reports)
+        
+        # Generate overview text using AI if available
         if generate_overview_fn:
             overview_data = generate_overview_fn(daily_reports)
             overview = overview_data.get("overview", "")
-            highlights = overview_data.get("trends", [])
+            # Use AI trends as highlights for metadata, but use linked trends for display
+            highlights = overview_data.get("trends", [h.get("text", "") for h in trends_with_links])
         else:
             overview = self._fallback_overview(daily_reports)
-            highlights = self._extract_trends(daily_reports)
+            highlights = [h.get("text", "") for h in trends_with_links]
         
-        content_blocks = self._build_content_blocks(daily_reports, highlights)
+        # Use trends_with_links for content blocks (has page_link info)
+        content_blocks = self._build_content_blocks(daily_reports, trends_with_links)
         
         return ReportData(
             period=period,

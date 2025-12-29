@@ -371,6 +371,38 @@ class NotionManager:
         """Create a divider block."""
         return {"object": "block", "type": "divider", "divider": {}}
 
+    def _block_callout(self, text: str, icon: str = "📌", url: Optional[str] = None) -> Dict[str, Any]:
+        """Create a callout block with optional link."""
+        rich_text = [
+            {
+                "type": "text",
+                "text": {"content": text[:2000], "link": {"url": url} if url else None},
+                "annotations": {"bold": True},
+            }
+        ]
+        return {
+            "object": "block",
+            "type": "callout",
+            "callout": {
+                "rich_text": rich_text,
+                "icon": {"type": "emoji", "emoji": icon},
+                "color": "gray_background",
+            },
+        }
+
+    def _block_labeled_text(self, label: str, text: str) -> Dict[str, Any]:
+        """Create a paragraph with bold label followed by regular text."""
+        return {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+                "rich_text": [
+                    {"type": "text", "text": {"content": label}, "annotations": {"bold": True}},
+                    {"type": "text", "text": {"content": text[:1900]}},
+                ]
+            },
+        }
+
     # ================================================================
     # Digest Page Creation
     # ================================================================
@@ -414,23 +446,30 @@ class NotionManager:
         if url_items:
             children_blocks.append(self._block_heading2(f"🔗 网页内容 ({len(url_items)}条)"))
             for item in url_items:
-                # Item title with page link
+                # Item title as callout (more visual distinction)
                 item_title = item.get("title", "无标题")
                 page_link = item.get("page_link", "")
-                if page_link:
-                    children_blocks.append(self._block_paragraph_with_link(f"📌 {item_title}", page_link))
-                else:
-                    children_blocks.append(self._block_heading3(f"📌 {item_title}"))
+                children_blocks.append(self._block_callout(item_title, "📌", page_link if page_link else None))
                 
-                # Highlights as bullet list
+                # TLDR summary with label
                 highlights = item.get("highlights", [])
-                for h in highlights:
-                    children_blocks.append(self._block_bullet(h))
+                if highlights:
+                    # First highlight as TLDR
+                    children_blocks.append(self._block_labeled_text("TLDR: ", highlights[0] if highlights else ""))
+                    
+                    # Remaining highlights as Insights
+                    if len(highlights) > 1:
+                        children_blocks.append(self._block_labeled_text("Insights:", ""))
+                        for h in highlights[1:]:
+                            children_blocks.append(self._block_bullet(h))
                 
                 # Source URL
                 url = item.get("url", "")
                 if url:
-                    children_blocks.append(self._block_paragraph_with_link(f"🌐 {url}", url))
+                    children_blocks.append(self._block_paragraph_with_link(f"🔗 {url}", url))
+                
+                # Add spacing between items
+                children_blocks.append(self._block_paragraph(""))
             
             children_blocks.append(self._block_divider())
 

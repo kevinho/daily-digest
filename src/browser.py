@@ -265,11 +265,13 @@ async def fetch_page_content(
                 await page.goto(url, wait_until="load", timeout=timeout_ms)
                 await page.wait_for_timeout(_wait_delay_ms(url))
                 html = await page.content()
-                if any(marker in html.lower() for marker in BLOCK_MARKERS):
-                    raise RuntimeError("blocked: login/JS wall detected")
+                
                 # Host-specific extractor (e.g., Twitter) with hybrid strategy
                 host = _host(url).lower()
-                if "x.com" in host or "twitter.com" in host:
+                is_twitter = "x.com" in host or "twitter.com" in host
+                
+                if is_twitter:
+                    # For Twitter: try Meta extraction FIRST (instant, no JS needed)
                     hybrid = await _extract_twitter_hybrid(page, html)
                     if hybrid.get("text"):
                         _cache_set(url, "text", hybrid["text"])
@@ -277,7 +279,13 @@ async def fetch_page_content(
                         _cache_set(url, "title", hybrid["title"])
                     if hybrid.get("text"):
                         return hybrid["text"]
+                    # Only check block markers if Meta extraction failed
+                    if any(marker in html.lower() for marker in BLOCK_MARKERS):
+                        raise RuntimeError("blocked: login/JS wall detected (no Meta content)")
                 else:
+                    # For non-Twitter: check block markers first
+                    if any(marker in html.lower() for marker in BLOCK_MARKERS):
+                        raise RuntimeError("blocked: login/JS wall detected")
                     host_text = await _extract_text_by_host(page, html, url)
                     if host_text:
                         _cache_set(url, "text", host_text)

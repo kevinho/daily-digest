@@ -66,15 +66,21 @@ async def fetch_page_content(
 
     async with async_playwright() as p:
         browser = await p.chromium.connect_over_cdp(cdp_url)
-        context = await browser.new_context(
-            user_agent=opts.get("user_agent"),
-            viewport=opts.get("viewport"),
-            device_scale_factor=opts.get("device_scale_factor"),
-            has_touch=opts.get("has_touch"),
-            is_mobile=opts.get("is_mobile"),
-            locale=opts.get("locale"),
-            timezone_id=opts.get("timezone_id"),
-        )
+        contexts = browser.contexts
+        created_context = False
+        if contexts:
+            context = contexts[0]
+        else:
+            context = await browser.new_context(
+                user_agent=opts.get("user_agent"),
+                viewport=opts.get("viewport"),
+                device_scale_factor=opts.get("device_scale_factor"),
+                has_touch=opts.get("has_touch"),
+                is_mobile=opts.get("is_mobile"),
+                locale=opts.get("locale"),
+                timezone_id=opts.get("timezone_id"),
+            )
+            created_context = True
         page = await context.new_page()
         if anti_bot_enabled and opts.get("init_script"):
             await context.add_init_script(opts["init_script"])
@@ -89,8 +95,8 @@ async def fetch_page_content(
             return None
         finally:
             await page.close()
-            await context.close()
-            await browser.close()
+            if created_context:
+                await context.close()
 
 
 def fetch_page_content_sync(url: str, cdp_url: str = "http://localhost:9222", timeout_ms: int = 15000) -> Optional[str]:

@@ -53,7 +53,7 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> str:
 
     try:
         text = asyncio.run(fetch_page_content(target_url, cdp_url))
-    except RuntimeError as exc:
+    except Exception as exc:  # catch RetryError/RuntimeError
         notion.mark_as_error(page_id, f"fetch failed: {exc}")
         return "error"
 

@@ -24,7 +24,7 @@ except ImportError:
         return None
 
 
-from src.utils import get_antibot_settings
+from src.utils import get_antibot_settings, get_int
 
 _PAGE_CACHE: Dict[str, Dict[str, str]] = {}
 
@@ -36,8 +36,72 @@ def _host(url: str) -> str:
         return ""
 
 
-async def _extract_twitter_text(page) -> Optional[str]:
-    """Best-effort extractor for X/Twitter."""
+def _extract_twitter_meta(html: str) -> dict:
+    """
+    Extract Twitter content from meta tags (instant, no DOM wait needed).
+    
+    Returns dict with:
+      - title: from og:title or oembed title attribute
+      - text: tweet body extracted from oembed title (content after ": " and before "/ X")
+    """
+    import re
+    result = {"title": None, "text": None}
+    
+    # Priority 1: oembed link title attribute (contains full content)
+    # Format: <link type="application/json+oembed" title="Author on X: &quot;content&quot; / X" ...>
+    oembed_match = re.search(
+        r'<link[^>]+type=["\']application/json\+oembed["\'][^>]+title=["\']([^"\']+)["\']',
+        html,
+        re.IGNORECASE
+    )
+    if not oembed_match:
+        # Try alternate attribute order
+        oembed_match = re.search(
+            r'<link[^>]+title=["\']([^"\']+)["\'][^>]+type=["\']application/json\+oembed["\']',
+            html,
+            re.IGNORECASE
+        )
+    
+    if oembed_match:
+        raw_title = oembed_match.group(1)
+        # Decode HTML entities
+        import html as html_module
+        decoded = html_module.unescape(raw_title)
+        result["title"] = decoded
+        
+        # Extract tweet body: after first ": " or ": \"" and before " / X" or "\" / X"
+        # Pattern: "Author on X: "content here" / X"
+        body_match = re.search(r':\s*["\']?(.+?)["\']?\s*/\s*X$', decoded)
+        if body_match:
+            result["text"] = body_match.group(1).strip().strip('"\'')
+    
+    # Priority 2: og:title meta tag (fallback for title)
+    if not result["title"]:
+        og_match = re.search(
+            r'<meta[^>]+(?:property|name)=["\']og:title["\'][^>]+content=["\']([^"\']+)["\']',
+            html,
+            re.IGNORECASE
+        )
+        if not og_match:
+            og_match = re.search(
+                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\']og:title["\']',
+                html,
+                re.IGNORECASE
+            )
+        if og_match:
+            import html as html_module
+            result["title"] = html_module.unescape(og_match.group(1))
+            # Try extract body from og:title too
+            if not result["text"]:
+                body_match = re.search(r':\s*["\']?(.+?)["\']?\s*/\s*X$', result["title"])
+                if body_match:
+                    result["text"] = body_match.group(1).strip().strip('"\'')
+    
+    return result
+
+
+async def _extract_twitter_dom(page) -> Optional[str]:
+    """DOM-based extractor for X/Twitter (requires page wait)."""
     tweet_locator = page.locator('div[data-testid="tweetText"]')
     tweet_count = await tweet_locator.count()
     if tweet_count > 0:
@@ -59,13 +123,40 @@ async def _extract_twitter_text(page) -> Optional[str]:
     return None
 
 
+async def _extract_twitter_hybrid(page, html: str) -> dict:
+    """
+    Hybrid Twitter extraction: Meta tags first, DOM fallback.
+    
+    Returns dict with 'title' and 'text' keys.
+    """
+    result = {"title": None, "text": None}
+    
+    # Step 1: Try instant meta tag extraction
+    meta = _extract_twitter_meta(html)
+    result["title"] = meta.get("title")
+    result["text"] = meta.get("text")
+    
+    # Step 2: If text is missing or too short, try DOM extraction
+    if not result["text"] or len(result["text"]) < 10:
+        dom_text = await _extract_twitter_dom(page)
+        if dom_text:
+            result["text"] = dom_text
+    
+    return result
+
+
 async def _extract_text_by_host(page, html: str, url: str) -> Optional[str]:
+    """Extract text using host-specific strategies."""
     host = _host(url).lower()
     if "x.com" in host or "twitter.com" in host:
-        text = await _extract_twitter_text(page)
-        if text:
-            return text
+        hybrid = await _extract_twitter_hybrid(page, html)
+        return hybrid.get("text")
     return None
+
+
+def _get_twitter_wait_ms() -> int:
+    """Get Twitter-specific wait time from env, default 10000ms."""
+    return get_int("TWITTER_WAIT_MS", 10000)
 
 
 def _cache_get(url: str, key: str) -> Optional[str]:
@@ -87,7 +178,7 @@ def _wait_delay_ms(url: str) -> int:
     """Return extra wait (ms) after navigation for dynamic pages."""
     host = (url or "").lower()
     if "x.com" in host or "twitter.com" in host:
-        return 10000
+        return _get_twitter_wait_ms()
     return 1500
 
 
@@ -176,11 +267,21 @@ async def fetch_page_content(
                 html = await page.content()
                 if any(marker in html.lower() for marker in BLOCK_MARKERS):
                     raise RuntimeError("blocked: login/JS wall detected")
-                # Host-specific extractor (e.g., Twitter)
-                host_text = await _extract_text_by_host(page, html, url)
-                if host_text:
-                    _cache_set(url, "text", host_text)
-                    return host_text
+                # Host-specific extractor (e.g., Twitter) with hybrid strategy
+                host = _host(url).lower()
+                if "x.com" in host or "twitter.com" in host:
+                    hybrid = await _extract_twitter_hybrid(page, html)
+                    if hybrid.get("text"):
+                        _cache_set(url, "text", hybrid["text"])
+                    if hybrid.get("title"):
+                        _cache_set(url, "title", hybrid["title"])
+                    if hybrid.get("text"):
+                        return hybrid["text"]
+                else:
+                    host_text = await _extract_text_by_host(page, html, url)
+                    if host_text:
+                        _cache_set(url, "text", host_text)
+                        return host_text
 
                 text = trafilatura.extract(html)
                 if text:
@@ -270,9 +371,19 @@ async def fetch_page_title(
 
                 # Best-effort: also extract text and cache it, to avoid re-open in content fetch
                 html = await page.content()
-                extracted_text = await _extract_text_by_host(page, html, url)
-                if extracted_text:
-                    _cache_set(url, "text", extracted_text)
+                host = _host(url).lower()
+                if "x.com" in host or "twitter.com" in host:
+                    # Use hybrid extraction for Twitter
+                    hybrid = await _extract_twitter_hybrid(page, html)
+                    if hybrid.get("text"):
+                        _cache_set(url, "text", hybrid["text"])
+                    # Prefer hybrid title over generic meta extraction
+                    if hybrid.get("title") and not title:
+                        title = hybrid["title"]
+                else:
+                    extracted_text = await _extract_text_by_host(page, html, url)
+                    if extracted_text:
+                        _cache_set(url, "text", extracted_text)
 
                 if title:
                     _cache_set(url, "title", title)

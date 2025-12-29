@@ -44,6 +44,9 @@ class FakeNotion:
     def mark_as_error(self, page_id, note):
         self.record["marked"].append(("error", page_id, note))
 
+    def set_title(self, page_id, title, note=None):
+        self.record["marked"].append(("set_title", page_id, title, note))
+
 
 def test_process_item_low_confidence(monkeypatch):
     fake = FakeNotion()

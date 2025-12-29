@@ -135,14 +135,12 @@ def _process_url_resource(page: Dict[str, Any], notion: Any, cdp_url: str) -> Di
     # Now handle based on ContentType processability
     if not content_type.processable and content_type != ContentType.UNKNOWN:
         # Non-processable content (PDF, IMAGE, VIDEO, AUDIO, BINARY)
-        reason = f"ContentType '{content_type.value}' not processable yet"
-        if content_type.future_support:
-            reason += " (future support planned)"
-        notion.mark_unprocessed(page_id, reason)
-        action = "backfilled" if title else ("skip" if has_name else "unprocessed")
+        # Use fallback handler: mark as ready without content extraction
+        summary = f"[{content_type.value.upper()}] {title or name or 'Untitled'}"
+        notion.mark_as_done(page_id, summary, status=notion.status.ready)
+        action = "backfilled" if title else ("skip" if has_name else "ready")
         return {
             "action": action,
-            "reason": reason,
             "item_type": "url_resource",
             "content_type": content_type.value,
             "title": title,

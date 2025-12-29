@@ -85,27 +85,53 @@ class DailyReportBuilder:
         )
     
     def _group_by_tags(self, items: List[Dict]) -> Dict[str, List[Dict]]:
-        """Group items by their tags, with fallback to content_type."""
+        """Group items using AI categorization with fallback."""
+        from src.llm import categorize_items
+        
+        # First, check if items have meaningful tags
+        has_meaningful_tags = False
+        for item in items:
+            tags = item.get("tags") or []
+            meaningful = [t for t in tags if t.lower() not in ("general", "未分类", "")]
+            if meaningful:
+                has_meaningful_tags = True
+                break
+        
+        # If items have meaningful tags, use them
+        if has_meaningful_tags:
+            return self._group_by_existing_tags(items)
+        
+        # Otherwise, use AI categorization
+        ai_categories = categorize_items(items)
+        
+        # Convert index-based categories to item-based
+        categories: Dict[str, List[Dict]] = {}
+        assigned_indices = set()
+        
+        for cat_name, indices in ai_categories.items():
+            categories[cat_name] = []
+            for idx in indices:
+                if 0 <= idx < len(items):
+                    categories[cat_name].append(items[idx])
+                    assigned_indices.add(idx)
+        
+        # Add any unassigned items to "其他" category
+        unassigned = [items[i] for i in range(len(items)) if i not in assigned_indices]
+        if unassigned:
+            categories["其他"] = unassigned
+        
+        return categories
+    
+    def _group_by_existing_tags(self, items: List[Dict]) -> Dict[str, List[Dict]]:
+        """Group items by their existing tags."""
         categories: Dict[str, List[Dict]] = {}
         
         for item in items:
             tags = item.get("tags") or []
-            
-            # Filter out generic tags like "general"
             meaningful_tags = [t for t in tags if t.lower() not in ("general", "未分类", "")]
             
             if not meaningful_tags:
-                # Fallback: use content_type or item_type for grouping
-                content_type = item.get("content_type") or ""
-                item_type = item.get("item_type") or ""
-                
-                if content_type and content_type.upper() != "HTML":
-                    # Group non-HTML content by type (PDF, Image, etc.)
-                    meaningful_tags = [f"📄 {content_type.upper()}"]
-                elif item_type and item_type.upper() == "NOTE_CONTENT":
-                    meaningful_tags = ["📝 笔记"]
-                else:
-                    meaningful_tags = ["🔗 网页"]
+                meaningful_tags = ["未分类"]
             
             for tag in meaningful_tags:
                 if tag not in categories:

@@ -147,6 +147,93 @@ def generate_overview_fallback(items: List[Dict]) -> str:
     return overview[:200]  # Limit length
 
 
+def categorize_items(items: List[Dict]) -> Dict[str, List[int]]:
+    """
+    Use AI to categorize items into meaningful groups.
+    
+    Args:
+        items: List of items with title, summary/tldr
+        
+    Returns:
+        Dict mapping category name to list of item indices
+    """
+    if not items:
+        return {}
+    
+    client = _get_openai_client()
+    if not client:
+        return _categorize_fallback(items)
+    
+    try:
+        # Build item descriptions for prompt
+        item_lines = []
+        for i, item in enumerate(items[:30]):  # Limit to 30 items
+            title = item.get("title", "无标题")[:50]
+            summary = (item.get("summary") or item.get("tldr") or "")[:80]
+            # Clean summary
+            summary = re.sub(r'\*{0,2}TLDR:?\*{0,2}\s*', '', summary, flags=re.IGNORECASE)
+            summary = summary.split('\n')[0][:80]
+            item_lines.append(f"{i}. {title} - {summary}")
+        
+        items_text = "\n".join(item_lines)
+        
+        prompt = f"""请将以下{len(items)}条内容分类到3-6个有意义的类别中。
+
+要求：
+1. 类别名称要简洁（2-4个字），如"AI教育"、"开源工具"、"投资理财"
+2. 每个内容只分到一个最相关的类别
+3. 返回JSON格式：{{"类别名": [序号列表], ...}}
+
+内容列表：
+{items_text}
+
+请直接返回JSON，不要添加其他内容。"""
+
+        resp = client.chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=500,
+            temperature=0.3,
+        )
+        content = resp.choices[0].message.content or "{}"
+        
+        # Parse JSON response
+        import json
+        # Clean up potential markdown code blocks
+        content = re.sub(r'```json\s*', '', content)
+        content = re.sub(r'```\s*', '', content)
+        content = content.strip()
+        
+        result = json.loads(content)
+        return result
+        
+    except Exception as e:
+        print(f"AI categorization error: {e}")
+        return _categorize_fallback(items)
+
+
+def _categorize_fallback(items: List[Dict]) -> Dict[str, List[int]]:
+    """Fallback categorization by content_type/item_type."""
+    categories: Dict[str, List[int]] = {}
+    
+    for i, item in enumerate(items):
+        content_type = (item.get("content_type") or "").upper()
+        item_type = (item.get("item_type") or "").upper()
+        
+        if content_type and content_type not in ("HTML", "UNKNOWN", ""):
+            cat = f"📄 {content_type}"
+        elif item_type == "NOTE_CONTENT":
+            cat = "📝 笔记"
+        else:
+            cat = "🔗 网页"
+        
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(i)
+    
+    return categories
+
+
 def parse_highlights(insights: str) -> List[str]:
     """
     Parse insights text into a list of highlights.

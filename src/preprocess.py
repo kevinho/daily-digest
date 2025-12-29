@@ -118,7 +118,7 @@ def _process_url_resource(page: Dict[str, Any], notion: Any, cdp_url: str) -> Di
                     title = derive_title_from_content(text)
             else:
                 # For non-processable types (PDF, IMAGE, etc.), use URL filename
-                title = _extract_filename_from_url(url)
+                title = _extract_filename_from_url(url, content_type)
         
         if not title and raw_content:
             title = derive_title_from_content(raw_content)
@@ -157,18 +157,63 @@ def _process_url_resource(page: Dict[str, Any], notion: Any, cdp_url: str) -> Di
     return {"action": "error", "reason": "backfill failed", "item_type": "url_resource", "content_type": content_type.value}
 
 
-def _extract_filename_from_url(url: str) -> Optional[str]:
-    """Extract filename from URL path for non-HTML resources."""
+def _extract_filename_from_url(url: str, content_type: Optional[ContentType] = None) -> Optional[str]:
+    """
+    Extract filename from URL path for non-HTML resources.
+    
+    Uses specialized handlers for specific content types.
+    """
+    from urllib.parse import unquote
+    import re
+    
+    if not url:
+        return None
+    
     try:
         parsed = urlparse(url)
-        path = parsed.path
-        if path:
-            # Get last segment of path
-            filename = path.rstrip("/").split("/")[-1]
-            # Remove query params if any leaked through
+        path = unquote(parsed.path)  # URL decode
+        
+        # Get path segments
+        segments = [s for s in path.split("/") if s]
+        if not segments:
+            # Try hostname as fallback
+            hostname = parsed.hostname or ""
+            if hostname:
+                ext = content_type.value if content_type else "file"
+                return f"{ext.upper()} from {hostname}"[:140]
+            return None
+        
+        filename = segments[-1]
+        
+        # Remove query params if leaked
+        if "?" in filename:
             filename = filename.split("?")[0]
-            if filename and "." in filename:
-                return filename[:140]
+        
+        # If filename has extension, use it
+        if filename and "." in filename:
+            return filename[:140]
+        
+        # Search all segments for file with extension
+        for seg in reversed(segments):
+            clean_seg = seg.split("?")[0]
+            if "." in clean_seg:
+                return clean_seg[:140]
+        
+        # Check query params for filename hints
+        query = parsed.query
+        if query:
+            for pattern in [r'filename=([^&]+)', r'name=([^&]+)', r'file=([^&]+)']:
+                match = re.search(pattern, query, re.IGNORECASE)
+                if match:
+                    found = unquote(match.group(1))
+                    if found:
+                        return found[:140]
+        
+        # Fallback: use last segment even without extension
+        if filename:
+            ext = content_type.value.upper() if content_type else ""
+            return f"{ext} {filename}".strip()[:140]
+        
         return None
     except Exception:
         return None

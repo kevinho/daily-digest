@@ -5,6 +5,7 @@ from src.handlers.base import BaseHandler
 from src.handlers.registry import get_handler, register_handler, get_all_handlers, clear_handlers
 from src.handlers.twitter import TwitterHandler, extract_tweet_id_from_url
 from src.handlers.generic import GenericHandler
+from src.handlers.pdf import PDFHandler
 
 
 class TestBaseHandler:
@@ -74,6 +75,44 @@ class TestGenericHandler:
     def test_handler_name(self):
         handler = GenericHandler()
         assert handler.name == "generic"
+
+
+class TestPDFHandler:
+    """Test PDFHandler."""
+    
+    def test_matches_pdf_extension(self):
+        assert PDFHandler.matches("https://example.com/doc.pdf")
+        assert PDFHandler.matches("https://example.com/path/to/file.PDF")
+    
+    def test_matches_pdf_with_query(self):
+        assert PDFHandler.matches("https://example.com/doc.pdf?token=abc")
+    
+    def test_does_not_match_non_pdf(self):
+        assert not PDFHandler.matches("https://example.com/page.html")
+        assert not PDFHandler.matches("https://example.com/image.jpg")
+        assert not PDFHandler.matches("")
+    
+    def test_extract_filename_simple(self):
+        assert PDFHandler.extract_filename("https://example.com/report.pdf") == "report.pdf"
+    
+    def test_extract_filename_with_path(self):
+        assert PDFHandler.extract_filename("https://example.com/docs/2024/annual-report.pdf") == "annual-report.pdf"
+    
+    def test_extract_filename_with_query(self):
+        assert PDFHandler.extract_filename("https://example.com/doc.pdf?token=xyz") == "doc.pdf"
+    
+    def test_extract_filename_url_encoded(self):
+        result = PDFHandler.extract_filename("https://example.com/my%20document.pdf")
+        assert result == "my document.pdf"
+    
+    def test_extract_filename_fallback(self):
+        # No .pdf in path, should use domain fallback
+        result = PDFHandler.extract_filename("https://example.com/download/12345")
+        assert "example.com" in result
+    
+    def test_handler_name(self):
+        handler = PDFHandler()
+        assert handler.name == "pdf"
 
 
 class TestHandlerRegistry:

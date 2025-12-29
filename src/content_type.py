@@ -236,10 +236,13 @@ async def detect_content_type(
     max_redirects: int = 5,
 ) -> Tuple[ContentType, str]:
     """
-    Detect ContentType via HTTP HEAD request.
+    Detect ContentType via URL extension first, then HTTP HEAD request.
     
-    Uses HEAD request to avoid downloading full content.
-    Falls back to URL extension, then domain inference if HEAD fails.
+    Priority:
+    1. URL extension for definitive file types (PDF, images, video, audio)
+    2. HTTP HEAD Content-Type header
+    3. Domain inference for known HTML sites
+    4. Assume HTML for successful responses
     
     Args:
         url: URL to check
@@ -250,6 +253,13 @@ async def detect_content_type(
     Returns:
         Tuple of (ContentType, reason_string)
     """
+    # FIRST: Check URL extension for definitive file types
+    # This prevents servers returning wrong Content-Type (e.g., HTML for PDF downloads)
+    ext_type = infer_from_extension(url)
+    if ext_type != ContentType.UNKNOWN and ext_type != ContentType.HTML:
+        # Trust URL extension for non-HTML types (PDF, images, video, audio)
+        return (ext_type, f"Inferred from URL extension")
+    
     try:
         import httpx
     except ImportError:

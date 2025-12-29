@@ -1,6 +1,6 @@
 import os
 import re
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional
 
 from dotenv import load_dotenv
 
@@ -11,10 +11,8 @@ except PermissionError:
     pass
 
 
-def generate_digest(text: str) -> Dict[str, str]:
-    """
-    Summarize text with OpenAI if available; otherwise fall back to truncate.
-    """
+def _get_openai_client():
+    """Get OpenAI client if available, None otherwise."""
     api_key = os.getenv("OPENAI_API_KEY")
     # Clean any proxy envs that might be injected by shell/tools
     for k in [
@@ -44,13 +42,165 @@ def generate_digest(text: str) -> Dict[str, str]:
                 super().__init__(*args, **kwargs)
 
     except ImportError:
-        OpenAI = None  # type: ignore
+        return None
 
-    print(f"OpenAI: {OpenAI}, api_key: {api_key}")
+    if not api_key:
+        return None
+    
+    return OpenAI(api_key=api_key)
 
-    if OpenAI and api_key:
+
+def generate_overview(items: List[Dict]) -> str:
+    """
+    Generate a comprehensive overview for a batch of items (100-150 chars).
+    
+    Args:
+        items: List of items, each with title, summary/tldr, tags
+        
+    Returns:
+        Overview text (100-150 Chinese characters)
+    """
+    if not items:
+        return "本批次无内容。"
+    
+    client = _get_openai_client()
+    if client:
         try:
-            client = OpenAI(api_key=api_key)
+            # Build content summary for prompt
+            content_lines = []
+            for item in items[:20]:  # Limit to 20 items
+                tags = item.get("tags", ["未分类"])
+                tag = tags[0] if tags else "未分类"
+                title = item.get("title", "无标题")
+                summary = (item.get("summary") or item.get("tldr") or "")[:100]
+                content_lines.append(f"- [{tag}] {title}: {summary}")
+            
+            content_summary = "\n".join(content_lines)
+            
+            prompt = f"""请为以下{len(items)}条内容生成一段综合概述（100-150字）。
+要求：
+1. 概括主要主题类别和数量分布
+2. 提炼核心要点和亮点
+3. 使用中文，简洁明了
+
+内容列表：
+{content_summary}
+
+请直接输出概述内容，不要添加标题或前缀。"""
+
+            resp = client.chat.completions.create(
+                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=300,
+                temperature=0.3,
+            )
+            content = resp.choices[0].message.content or ""
+            return content.strip()
+        except Exception as e:
+            print(f"OpenAI error in generate_overview: {e}")
+    
+    # Fallback to simple overview
+    return generate_overview_fallback(items)
+
+
+def generate_overview_fallback(items: List[Dict]) -> str:
+    """
+    Generate a simple overview without AI.
+    
+    Args:
+        items: List of items
+        
+    Returns:
+        Simple overview text
+    """
+    if not items:
+        return "本批次无内容。"
+    
+    # Count by tag
+    tag_counts: Dict[str, int] = {}
+    for item in items:
+        tags = item.get("tags", ["未分类"])
+        for tag in tags:
+            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+    
+    # Build overview
+    total = len(items)
+    tag_parts = []
+    for tag, count in sorted(tag_counts.items(), key=lambda x: -x[1]):
+        tag_parts.append(f"{tag}（{count}条）")
+    
+    tags_str = "、".join(tag_parts[:5])  # Top 5 tags
+    
+    # Get first few titles as highlights
+    highlights = []
+    for item in items[:3]:
+        title = item.get("title", "")
+        if title:
+            highlights.append(title[:20])
+    
+    highlights_str = "、".join(highlights) if highlights else ""
+    
+    overview = f"本批次共收集{total}条内容，涵盖{tags_str}。"
+    if highlights_str:
+        overview += f"重点内容包括：{highlights_str}等。"
+    
+    return overview[:200]  # Limit length
+
+
+def parse_highlights(insights: str) -> List[str]:
+    """
+    Parse insights text into a list of highlights.
+    
+    Args:
+        insights: Raw insights text (may contain bullet points)
+        
+    Returns:
+        List of highlight strings (3-5 items, each ≤30 chars)
+    """
+    if not insights:
+        return []
+    
+    # Split by newlines and clean up
+    lines = insights.strip().split("\n")
+    highlights = []
+    
+    for line in lines:
+        # Remove bullet markers
+        line = line.strip()
+        line = re.sub(r"^[-•*·]\s*", "", line)
+        line = re.sub(r"^\d+[.、]\s*", "", line)  # Remove numbered list markers
+        line = line.strip()
+        
+        if not line:
+            continue
+        
+        # Remove common prefixes like "Insights:" or "要点:"
+        line = re.sub(r"^(Insights|要点|TLDR|总结)[：:]\s*", "", line, flags=re.IGNORECASE)
+        line = line.strip()
+        
+        if not line:
+            continue
+        
+        # Truncate to 30 chars if needed
+        if len(line) > 30:
+            line = line[:30]
+        
+        highlights.append(line)
+        
+        if len(highlights) >= 5:
+            break
+    
+    return highlights[:5]  # Max 5 highlights
+
+
+def generate_digest(text: str) -> Dict[str, str]:
+    """
+    Summarize text with OpenAI if available; otherwise fall back to truncate.
+    """
+    client = _get_openai_client()
+    
+    if client:
+        try:
             prompt = (
                 "请用中文总结下面内容，输出两部分：\n"
                 "TLDR: 一句话总结\n"
@@ -71,9 +221,7 @@ def generate_digest(text: str) -> Dict[str, str]:
             return {"tldr": tldr, "insights": insights}
         except Exception as e:
             print(f"OpenAI error: {e}")
-            pass
-    else:
-        print("OpenAI not available")
+    
     # Fallback
     tldr = (text or "TL;DR placeholder")[:120]
     # Try to create simple bullet insights from sentences

@@ -69,15 +69,15 @@
 
 | Task | Status | Notes |
 |------|--------|-------|
-| T001 | ⬜ | |
-| T002 | ⬜ | |
-| T003 | ⬜ | |
-| T004 | ⬜ | |
-| T005 | ⬜ | |
-| T006 | ⬜ | |
-| T007 | ⬜ | |
-| T008 | ⬜ | |
-| T009 | ⬜ | |
-| T010 | ⬜ | |
-| T011 | ⬜ | |
+| T001 | ✅ | `generate_overview()` in llm.py |
+| T002 | ✅ | `generate_overview_fallback()` in llm.py |
+| T003 | ✅ | `build_digest()` calls overview |
+| T004 | ✅ | `parse_highlights()` in llm.py |
+| T005 | ✅ | New tag_groups structure |
+| T006 | ✅ | Block helpers in notion.py |
+| T007 | ✅ | Merged with T008 |
+| T008 | ✅ | `create_digest_page()` updated |
+| T009 | ✅ | main.py adapted |
+| T010 | ✅ | tests/test_digest.py |
+| T011 | ✅ | tests/test_llm_overview.py |
 

@@ -273,61 +273,134 @@ class NotionManager:
             merged[self.prop.reason] = {"rich_text": [{"text": {"content": note[:1900]}}]}
         return merged
 
+    # ================================================================
+    # Block Helper Functions for Notion Page Content
+    # ================================================================
+
+    def _block_heading1(self, text: str) -> Dict[str, Any]:
+        """Create a heading_1 block."""
+        return {
+            "object": "block",
+            "type": "heading_1",
+            "heading_1": {"rich_text": [{"type": "text", "text": {"content": text[:2000]}}]},
+        }
+
+    def _block_heading2(self, text: str) -> Dict[str, Any]:
+        """Create a heading_2 block."""
+        return {
+            "object": "block",
+            "type": "heading_2",
+            "heading_2": {"rich_text": [{"type": "text", "text": {"content": text[:2000]}}]},
+        }
+
+    def _block_heading3(self, text: str) -> Dict[str, Any]:
+        """Create a heading_3 block."""
+        return {
+            "object": "block",
+            "type": "heading_3",
+            "heading_3": {"rich_text": [{"type": "text", "text": {"content": text[:2000]}}]},
+        }
+
+    def _block_paragraph(self, text: str) -> Dict[str, Any]:
+        """Create a paragraph block."""
+        return {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {"rich_text": [{"type": "text", "text": {"content": text[:2000]}}]},
+        }
+
+    def _block_paragraph_with_link(self, text: str, url: str) -> Dict[str, Any]:
+        """Create a paragraph block with a clickable link."""
+        return {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+                "rich_text": [
+                    {"type": "text", "text": {"content": text, "link": {"url": url}}}
+                ]
+            },
+        }
+
+    def _block_bullet(self, text: str) -> Dict[str, Any]:
+        """Create a bulleted_list_item block."""
+        return {
+            "object": "block",
+            "type": "bulleted_list_item",
+            "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": text[:2000]}}]},
+        }
+
+    def _block_divider(self) -> Dict[str, Any]:
+        """Create a divider block."""
+        return {"object": "block", "type": "divider", "divider": {}}
+
+    # ================================================================
+    # Digest Page Creation
+    # ================================================================
+
     def create_digest_page(
         self,
         title: str,
-        sections: List[Dict[str, Any]],
-        citations: List[str],
+        digest_data: Dict[str, Any],
         metadata: Optional[Dict[str, str]] = None,
     ) -> Optional[str]:
         """
-        Write a digest page under a parent page.
-        Requires NOTION_DIGEST_PARENT_ID to be set.
+        Create a digest page with the new structured format.
+        
+        Args:
+            title: Page title
+            digest_data: Dict with 'overview', 'tag_groups', 'citations'
+            metadata: Optional metadata dict
+            
+        Returns:
+            Created page ID or None
         """
         if not self.digest_parent_id:
             return None
 
         children_blocks: List[Dict[str, Any]] = []
 
-        # Optional metadata paragraph
+        # Metadata line
         if metadata:
-            meta_text = " | ".join(f"{k}: {v}" for k, v in metadata.items())
-            children_blocks.append(
-                {
-                    "object": "block",
-                    "type": "paragraph",
-                    "paragraph": {"rich_text": [{"type": "text", "text": {"content": meta_text}}]},
-                }
-            )
-        for sec in sections:
-            heading = {
-                "object": "block",
-                "type": "heading_2",
-                "heading_2": {
-                    "rich_text": [{"type": "text", "text": {"content": sec.get("title", "Section")}}],
-                },
-            }
-            summary_text = sec.get("summary", "")
-            body = {
-                "object": "block",
-                "type": "paragraph",
-                "paragraph": {"rich_text": [{"type": "text", "text": {"content": summary_text}}]},
-            }
-            children_blocks.extend([heading, body])
+            meta_text = "📊 " + " | ".join(f"{k}: {v}" for k, v in metadata.items())
+            children_blocks.append(self._block_paragraph(meta_text))
 
-        citations_block = {
-            "object": "block",
-            "type": "paragraph",
-            "paragraph": {
-                "rich_text": [
-                    {
-                        "type": "text",
-                        "text": {"content": "Citations: " + ", ".join(citations) if citations else "Citations: none"},
-                    }
-                ]
-            },
-        }
-        children_blocks.append(citations_block)
+        # Overview section
+        children_blocks.append(self._block_heading1("📋 综合概述"))
+        overview = digest_data.get("overview", "")
+        if overview:
+            children_blocks.append(self._block_paragraph(overview))
+        children_blocks.append(self._block_divider())
+
+        # Tag groups with items
+        tag_groups = digest_data.get("tag_groups", [])
+        for group in tag_groups:
+            tag = group.get("tag", "未分类")
+            children_blocks.append(self._block_heading2(f"【{tag}】"))
+            
+            items = group.get("items", [])
+            for item in items:
+                # Item title
+                item_title = item.get("title", "无标题")
+                children_blocks.append(self._block_heading3(f"📌 {item_title}"))
+                
+                # Highlights as bullet list
+                highlights = item.get("highlights", [])
+                for h in highlights:
+                    children_blocks.append(self._block_bullet(h))
+                
+                # URL as clickable link
+                url = item.get("url", "")
+                if url:
+                    children_blocks.append(self._block_paragraph_with_link(f"🔗 {url}", url))
+            
+            children_blocks.append(self._block_divider())
+
+        # Citations
+        citations = digest_data.get("citations", [])
+        citations_text = f"引用: {', '.join(citations[:20])}" if citations else "引用: 无"
+        if len(citations) > 20:
+            citations_text += f" (等共{len(citations)}条)"
+        children_blocks.append(self._block_paragraph(citations_text))
 
         page = self.client.pages.create(
             parent={"type": "page_id", "page_id": self.digest_parent_id},

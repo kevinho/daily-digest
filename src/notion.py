@@ -454,37 +454,44 @@ class NotionManager:
     def add_file_to_item(
         self,
         page_id: str,
-        file_path: str,
+        file_url: str,
         file_name: Optional[str] = None,
     ) -> bool:
         """
-        Add a file reference to the Files property.
+        Add an external file URL to the Files property.
         
-        Note: Notion API doesn't support direct file upload. This method adds
-        the file as an external URL reference using file:// protocol for local files.
-        For true cloud storage, you'd need to upload to S3/R2 first.
+        IMPORTANT: Notion API only supports publicly accessible HTTP/HTTPS URLs.
+        Local file:// URLs will NOT work - they appear as broken images.
+        
+        For local screenshots, you must first upload to cloud storage (S3, R2, etc.)
+        and use the returned public URL.
         
         Args:
             page_id: Notion page ID
-            file_path: Local file path (absolute or relative)
-            file_name: Display name for the file (defaults to basename)
+            file_url: Public HTTP/HTTPS URL of the file
+            file_name: Display name for the file (optional)
             
         Returns:
             True if successful, False otherwise
         """
-        import os
+        import logging
+        logger = logging.getLogger(__name__)
         
-        if not file_path or not os.path.exists(file_path):
+        if not file_url:
             return False
         
-        # Convert to absolute path
-        abs_path = os.path.abspath(file_path)
+        # Validate URL - must be HTTP/HTTPS
+        if not file_url.startswith(("http://", "https://")):
+            logger.warning(
+                f"Skipping file attachment: Notion only supports HTTP/HTTPS URLs. "
+                f"Got: {file_url[:50]}... "
+                f"Consider uploading to cloud storage first."
+            )
+            return False
         
-        # Use file:// protocol for local files
-        file_url = f"file://{abs_path}"
-        
-        # Get display name
-        display_name = file_name or os.path.basename(file_path)
+        # Get display name from URL if not provided
+        if not file_name:
+            file_name = file_url.split("/")[-1].split("?")[0] or "file"
         
         try:
             # First, get existing files to preserve them
@@ -499,7 +506,7 @@ class NotionManager:
             # Add new file as external reference
             new_file = {
                 "type": "external",
-                "name": display_name,
+                "name": file_name,
                 "external": {"url": file_url}
             }
             existing_files.append(new_file)
@@ -512,7 +519,5 @@ class NotionManager:
             return True
             
         except Exception as e:
-            # Log the error but don't raise - screenshot is non-critical
-            import logging
-            logging.getLogger(__name__).warning(f"Failed to add file to Notion: {e}")
+            logger.warning(f"Failed to add file to Notion: {e}")
             return False

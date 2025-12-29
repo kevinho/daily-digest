@@ -101,21 +101,17 @@ def process_item(page: dict, notion: NotionManager, cdp_url: str) -> str:
         return "error"
 
     # Capture screenshot for Twitter URLs (non-blocking)
+    # NOTE: Screenshots are saved locally. Notion Files field requires HTTP/HTTPS URLs.
+    # To display in Notion, upload to cloud storage (S3/R2) and use public URL.
     is_twitter = "twitter.com" in url.lower() or "x.com" in url.lower()
     screenshot_path = None
     if is_twitter and get_screenshot_enabled():
         try:
             screenshot_path = asyncio.run(capture_tweet_screenshot_standalone(target_url, cdp_url))
             if screenshot_path:
-                # Upload to Notion Files field
-                upload_success = notion.add_file_to_item(page_id, screenshot_path)
-                if upload_success:
-                    logging.info(f"Screenshot uploaded for {page_id}: {screenshot_path}")
-                # Clean up temp file
-                try:
-                    os.remove(screenshot_path)
-                except Exception:
-                    pass
+                logging.info(f"Tweet screenshot saved: {screenshot_path}")
+                # TODO: Upload to cloud storage and call notion.add_file_to_item(page_id, public_url)
+                # For now, keep screenshot file locally for manual reference
         except Exception as e:
             # Screenshot failure is non-critical
             logging.warning(f"Screenshot capture failed for {url}: {e}")

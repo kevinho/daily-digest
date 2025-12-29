@@ -29,6 +29,18 @@ init_script:
   navigator.plugins   = [1,2,3,4,5]
 ```
 
+### 推荐 `.env` 片段
+```
+ANTI_BOT_ENABLE=true
+ANTI_BOT_ARGS=--disable-blink-features=AutomationControlled --no-sandbox
+ANTI_BOT_USER_AGENT=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36
+ANTI_BOT_VIEWPORT=1280x720
+ANTI_BOT_DEVICE_SCALE=2
+ANTI_BOT_LOCALE=en-US
+ANTI_BOT_TIMEZONE=America/Los_Angeles
+# ANTI_BOT_INIT_SCRIPT=  # 留空使用默认脚本
+```
+
 ## 运行
 1) 安装依赖（首次）：`pip install -r requirements.txt`  
 2) 校验 Notion schema：`python scripts/check_schema.py`  

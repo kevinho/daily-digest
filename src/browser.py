@@ -1,5 +1,5 @@
 import asyncio
-from typing import Callable, Optional, TypeVar
+from typing import Callable, Dict, Optional, TypeVar
 
 try:
     from tenacity import retry, stop_after_attempt, wait_exponential
@@ -23,8 +23,51 @@ except ImportError:
         return None
 
 
+DEFAULT_ANTI_BOT_ARGS = [
+    "--disable-blink-features=AutomationControlled",
+    "--no-sandbox",
+]
+
+DEFAULT_INIT_SCRIPT = """
+// Remove webdriver
+Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+// Fake plugins
+Object.defineProperty(navigator, 'plugins', { get: () => [1,2,3,4,5] });
+"""
+
+
+def _page_options(override: Optional[Dict] = None) -> Dict:
+    base = {
+        "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+        "viewport": {"width": 1280, "height": 720},
+        "device_scale_factor": 2,
+        "has_touch": False,
+        "is_mobile": False,
+        "locale": "en-US",
+        "timezone_id": "America/Los_Angeles",
+    }
+    if override:
+        base.update(override)
+    return base
+
+
+BLOCK_MARKERS = [
+    "javascript is disabled",
+    "enable javascript",
+    "continue using x.com",
+    "登录后查看",
+    "sign in to x",
+]
+
+
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5, min=1, max=4))
-async def fetch_page_content(url: str, cdp_url: str = "http://localhost:9222", timeout_ms: int = 15000) -> Optional[str]:
+async def fetch_page_content(
+    url: str,
+    cdp_url: str = "http://localhost:9222",
+    timeout_ms: int = 15000,
+    anti_bot: bool = True,
+    page_options: Optional[Dict] = None,
+) -> Optional[str]:
     # Lazy import to avoid hard dependency at module import time (helps tests without playwright installed)
     try:
         from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
@@ -36,18 +79,34 @@ async def fetch_page_content(url: str, cdp_url: str = "http://localhost:9222", t
     except ImportError as exc:
         raise RuntimeError("trafilatura is required to extract text") from exc
 
+    opts = _page_options(page_options)
+
     async with async_playwright() as p:
         browser = await p.chromium.connect_over_cdp(cdp_url)
-        page = await browser.new_page()
+        context = await browser.new_context(
+            user_agent=opts.get("user_agent"),
+            viewport=opts.get("viewport"),
+            device_scale_factor=opts.get("device_scale_factor"),
+            has_touch=opts.get("has_touch"),
+            is_mobile=opts.get("is_mobile"),
+            locale=opts.get("locale"),
+            timezone_id=opts.get("timezone_id"),
+        )
+        page = await context.new_page()
+        if anti_bot:
+            await context.add_init_script(DEFAULT_INIT_SCRIPT)
         try:
             await page.goto(url, wait_until="load", timeout=timeout_ms)
             html = await page.content()
+            if any(marker in html.lower() for marker in BLOCK_MARKERS):
+                raise RuntimeError("blocked: login/JS wall detected")
             text = trafilatura.extract(html)
             return text
         except PlaywrightTimeoutError:
             return None
         finally:
             await page.close()
+            await context.close()
             await browser.close()
 
 

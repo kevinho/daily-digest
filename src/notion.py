@@ -194,8 +194,21 @@ class NotionManager:
         status_name = None
         if "status" in status_prop and isinstance(status_prop["status"], dict):
             status_name = status_prop["status"].get("name")
+        
+        # Extract item_type
+        item_type_prop = props.get(self.prop.item_type, {})
+        item_type_value = None
+        if isinstance(item_type_prop, dict) and "select" in item_type_prop:
+            select_val = item_type_prop.get("select")
+            if isinstance(select_val, dict):
+                item_type_value = select_val.get("name")
+        
+        # Generate page link
+        page_id = page.get("id", "")
+        page_link = f"https://notion.so/{page_id.replace('-', '')}" if page_id else ""
+        
         return {
-            "id": page.get("id"),
+            "id": page_id,
             "url": url,
             "attachments": attachments,
             "status": status_name,
@@ -204,6 +217,8 @@ class NotionManager:
             "tags": tags,
             "raw_content": raw_text,
             "source": source_value,
+            "item_type": item_type_value,
+            "page_link": page_link,
             "raw": page,
         }
 
@@ -329,6 +344,18 @@ class NotionManager:
             "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": text[:2000]}}]},
         }
 
+    def _block_bullet_with_link(self, text: str, url: str) -> Dict[str, Any]:
+        """Create a bulleted_list_item block with clickable link."""
+        return {
+            "object": "block",
+            "type": "bulleted_list_item",
+            "bulleted_list_item": {
+                "rich_text": [
+                    {"type": "text", "text": {"content": text[:2000], "link": {"url": url}}}
+                ]
+            },
+        }
+
     def _block_divider(self) -> Dict[str, Any]:
         """Create a divider block."""
         return {"object": "block", "type": "divider", "divider": {}}
@@ -344,11 +371,11 @@ class NotionManager:
         metadata: Optional[Dict[str, str]] = None,
     ) -> Optional[str]:
         """
-        Create a digest page with the new structured format.
+        Create a digest page with ItemType-based structure.
         
         Args:
             title: Page title
-            digest_data: Dict with 'overview', 'tag_groups', 'citations'
+            digest_data: Dict with 'overview', 'url_items', 'note_items', 'empty_items', 'citations'
             metadata: Optional metadata dict
             
         Returns:
@@ -371,35 +398,62 @@ class NotionManager:
             children_blocks.append(self._block_paragraph(overview))
         children_blocks.append(self._block_divider())
 
-        # Tag groups with items
-        tag_groups = digest_data.get("tag_groups", [])
-        for group in tag_groups:
-            tag = group.get("tag", "未分类")
-            children_blocks.append(self._block_heading2(f"【{tag}】"))
-            
-            items = group.get("items", [])
-            for item in items:
-                # Item title
+        # URL Items section (with full summaries)
+        url_items = digest_data.get("url_items", [])
+        if url_items:
+            children_blocks.append(self._block_heading2(f"🔗 网页内容 ({len(url_items)}条)"))
+            for item in url_items:
+                # Item title with page link
                 item_title = item.get("title", "无标题")
-                children_blocks.append(self._block_heading3(f"📌 {item_title}"))
+                page_link = item.get("page_link", "")
+                if page_link:
+                    children_blocks.append(self._block_paragraph_with_link(f"📌 {item_title}", page_link))
+                else:
+                    children_blocks.append(self._block_heading3(f"📌 {item_title}"))
                 
                 # Highlights as bullet list
                 highlights = item.get("highlights", [])
                 for h in highlights:
                     children_blocks.append(self._block_bullet(h))
                 
-                # URL as clickable link
+                # Source URL
                 url = item.get("url", "")
                 if url:
-                    children_blocks.append(self._block_paragraph_with_link(f"🔗 {url}", url))
+                    children_blocks.append(self._block_paragraph_with_link(f"🌐 {url}", url))
+            
+            children_blocks.append(self._block_divider())
+
+        # Note Items section (title + page_link only)
+        note_items = digest_data.get("note_items", [])
+        if note_items:
+            children_blocks.append(self._block_heading2(f"📝 笔记内容 ({len(note_items)}条)"))
+            for item in note_items:
+                item_title = item.get("title", "无标题")
+                page_link = item.get("page_link", "")
+                if page_link:
+                    children_blocks.append(self._block_bullet_with_link(item_title, page_link))
+                else:
+                    children_blocks.append(self._block_bullet(item_title))
+            
+            children_blocks.append(self._block_divider())
+
+        # Empty Items section (title + page_link only)
+        empty_items = digest_data.get("empty_items", [])
+        if empty_items:
+            children_blocks.append(self._block_heading2(f"⚠️ 待处理 ({len(empty_items)}条)"))
+            for item in empty_items:
+                item_title = item.get("title", "无标题")
+                page_link = item.get("page_link", "")
+                if page_link:
+                    children_blocks.append(self._block_bullet_with_link(item_title, page_link))
+                else:
+                    children_blocks.append(self._block_bullet(item_title))
             
             children_blocks.append(self._block_divider())
 
         # Citations
         citations = digest_data.get("citations", [])
-        citations_text = f"引用: {', '.join(citations[:20])}" if citations else "引用: 无"
-        if len(citations) > 20:
-            citations_text += f" (等共{len(citations)}条)"
+        citations_text = f"引用: {len(citations)}条" if citations else "引用: 无"
         children_blocks.append(self._block_paragraph(citations_text))
 
         page = self.client.pages.create(

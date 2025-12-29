@@ -193,9 +193,11 @@ def main(digest_window: Optional[str] = None, preprocess_only: bool = False) -> 
         logging.info("Manual digest trigger requested for window=%s", digest_window)
         ready = notion.fetch_ready_for_digest(since=None, until=None, include_private=False)
         digest_payload = build_digest(ready)
-        num_groups = len(digest_payload.get("tag_groups", []))
+        num_url = len(digest_payload.get("url_items", []))
+        num_note = len(digest_payload.get("note_items", []))
+        num_empty = len(digest_payload.get("empty_items", []))
         num_citations = len(digest_payload.get("citations", []))
-        logging.info("Digest built with %d tag groups, %d citations", num_groups, num_citations)
+        logging.info("Digest built: %d url, %d note, %d empty, %d citations", num_url, num_note, num_empty, num_citations)
         now = datetime.now(get_timezone())
         digest_title = f"Digest ({digest_window}) {now.strftime('%Y-%m-%d %H:%M')}"
         metadata = {"window": digest_window, "items": str(len(ready)), "generated_at": now.isoformat()}

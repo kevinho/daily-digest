@@ -47,27 +47,33 @@ class ReportingDBManager:
         """
         Query the Reporting database.
         
-        Handles both regular database and data source queries.
+        Prioritizes regular database query, falls back to data_sources if needed.
         """
         query_params = {"filter": filter_obj}
         if sorts:
             query_params["sorts"] = sorts
         
         try:
-            if self.data_source_id:
-                # Use data_sources endpoint for synced databases
-                response = self.client.request(
-                    path=f"data_sources/{self.data_source_id}/query",
-                    method="post",
-                    body=query_params,
-                )
-            else:
-                response = self.client.databases.query(
-                    database_id=self.database_id,
-                    **query_params,
-                )
+            # Always try regular database query first (most reliable)
+            response = self.client.databases.query(
+                database_id=self.database_id,
+                **query_params,
+            )
             return response.get("results", [])
         except APIResponseError as e:
+            # If regular query fails and we have a data_source_id, try that
+            if self.data_source_id:
+                logger.warning(f"Regular DB query failed, trying data_sources: {e}")
+                try:
+                    response = self.client.request(
+                        path=f"data_sources/{self.data_source_id}/query",
+                        method="post",
+                        body=query_params,
+                    )
+                    return response.get("results", [])
+                except APIResponseError as e2:
+                    logger.error(f"Data sources query also failed: {e2}")
+                    return []
             logger.error(f"Notion API error during query: {e}")
             return []
     

@@ -157,6 +157,32 @@ https://www.notion.so/workspace/DATABASE_ID?v=...
 
 复制 32 位的 `DATABASE_ID` 到对应环境变量。
 
+### 获取 Data Source ID（同步数据库）
+
+如果你使用的是 **同步数据库**（Synced Database），需要额外获取 Data Source ID：
+
+1. 打开数据库页面，点击右上角「...」
+2. 选择「Copy link to view」
+3. URL 格式如下：
+   ```
+   https://www.notion.so/workspace/DATABASE_ID?v=VIEW_ID&pvs=4
+   ```
+4. 使用 Notion API 查询数据库信息：
+   ```bash
+   curl -X GET "https://api.notion.com/v1/databases/DATABASE_ID" \
+     -H "Authorization: Bearer YOUR_NOTION_TOKEN" \
+     -H "Notion-Version: 2022-06-28" | jq '.id, .parent'
+   ```
+5. 对于同步数据库，响应中会包含 `parent.type: "block_id"` 或相关信息
+6. 或者直接在浏览器开发者工具的 Network 面板中，查看 Notion 请求，找到 `spaceId` 或 `data_source_id`
+
+> 💡 **提示**：普通数据库不需要 Data Source ID，留空即可。只有从外部同步的数据库（如 Google Calendar、GitHub 等）才需要配置。
+
+**简便方法**：运行以下脚本自动获取：
+```bash
+python scripts/get_datasource_id.py --database-id YOUR_DATABASE_ID
+```
+
 ---
 
 ## 🐛 常见问题

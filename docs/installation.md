@@ -42,11 +42,13 @@ cp .env.example .env
 # ===================
 NOTION_TOKEN=secret_xxx                 # Notion Integration Token
 NOTION_DATABASE_ID=xxx                  # Inbox 数据库 ID
+NOTION_DATA_SOURCE_ID=xxx               # Inbox Data Source ID（同步数据库用，可选）
 
 # ===================
 # Notion 配置 - Report 数据库
 # ===================
 NOTION_REPORTING_DB_ID=xxx              # Report 数据库 ID
+NOTION_REPORTING_DS_ID=xxx              # Report Data Source ID（同步数据库用，可选）
 
 # ===================
 # Chrome 远程调试

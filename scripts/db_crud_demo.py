@@ -4,7 +4,7 @@ Lightweight CRUD helper for the Notion database.
 
 Env vars:
 - NOTION_TOKEN
-- NOTION_DATABASE_ID
+- NOTION_ITEM_DB_ID
 - (optional) NOTION_PROP_TITLE (default "Name")
 - (optional) NOTION_PROP_STATUS (default "Status")
 - (optional) NOTION_PROP_URL (default "URL")
@@ -43,7 +43,7 @@ def build_props_config() -> Dict[str, str]:
 def query_database(client: Client, database_id: str, data_source_id: Optional[str], **body: Any) -> Dict[str, Any]:
     """Compat helper for query.
 
-    - If NOTION_DATA_SOURCE_ID is set, try data_sources/{id}/query (for synced DB).
+    - If NOTION_ITEM_DS_ID is set, try data_sources/{id}/query (for synced DB).
     - Otherwise use databases/{id}/query.
     """
     if data_source_id:
@@ -117,8 +117,8 @@ def cmd_archive(client: Client, page_id: str) -> None:
 def main() -> None:
     load_dotenv()
     token = get_env("NOTION_TOKEN", required=True)
-    database_id = get_env("NOTION_DATABASE_ID", required=True)
-    data_source_id = os.getenv("NOTION_DATA_SOURCE_ID")
+    database_id = get_env("NOTION_ITEM_DB_ID", required=True)
+    data_source_id = os.getenv("NOTION_ITEM_DS_ID")
     props = build_props_config()
     client = Client(auth=token)
 

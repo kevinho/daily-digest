@@ -2,7 +2,7 @@
 
 ## Prereqs
 
-- Notion credentials set: `NOTION_TOKEN`, `NOTION_DATABASE_ID` (and optional `NOTION_DATA_SOURCE_ID`), status/select schema includes `Name`, `URL`, `Raw Content`, `Status`, `Reason`/`Notes`.
+- Notion credentials set: `NOTION_TOKEN`, `NOTION_ITEM_DB_ID` (and optional `NOTION_ITEM_DS_ID`), status/select schema includes `Name`, `URL`, `Raw Content`, `Status`, `Reason`/`Notes`.
 - Chrome with remote debugging: `CHROME_REMOTE_URL` (default `http://localhost:9222`) and running with user profile that can open target URLs.
 - Python env (3.11) with `pip install -r requirements.txt`.
 - Optional: `OPENAI_API_KEY` (not required for preprocessing but used by other flows).

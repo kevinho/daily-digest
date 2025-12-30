@@ -1,7 +1,7 @@
 # Quickstart: Twitter 内容读取 (003-twitter-ingest)
 
 ## 前置
-- 准备 `.env`：`NOTION_TOKEN`, `NOTION_DATABASE_ID/NOTION_DATA_SOURCE_ID`, `CHROME_REMOTE_URL`（若用已登录 Chrome），`LOG_LEVEL` 等。
+- 准备 `.env`：`NOTION_TOKEN`, `NOTION_ITEM_DB_ID/NOTION_ITEM_DS_ID`, `CHROME_REMOTE_URL`（若用已登录 Chrome），`LOG_LEVEL` 等。
 - Notion 字段包含 `Reason`（rich_text）；可运行 `python scripts/check_schema.py` 验证。
 - 确保有可用的登录状态：  
   - 方案 A：使用已启动的调试 Chrome（`start_chrome.sh` 或手动 `--remote-debugging-port=9222`）。  

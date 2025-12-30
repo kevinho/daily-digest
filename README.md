@@ -113,10 +113,10 @@ Level 1: Items ─────┘ (Inbox DB → status=ready)
 
 | 数据库 | 用途 | 环境变量 |
 |--------|------|----------|
-| **Inbox DB** | 收集原始内容（URL、笔记） | `NOTION_DATABASE_ID`、`NOTION_DATA_SOURCE_ID` |
+| **Inbox DB** | 收集原始内容（URL、笔记） | `NOTION_ITEM_DB_ID`、`NOTION_ITEM_DS_ID` |
 | **Report DB** | 存储生成的报告（日报/周报/月报） | `NOTION_REPORTING_DB_ID`、`NOTION_REPORTING_DS_ID` |
 
-> 💡 `DATA_SOURCE_ID` 用于同步数据库场景，如果使用普通数据库可留空。
+> 💡 `*_DS_ID` 用于同步数据库场景，如果使用普通数据库可留空。
 
 ### Inbox 数据库字段
 

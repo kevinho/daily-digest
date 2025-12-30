@@ -6,8 +6,8 @@ Usage:
   python scripts/check_schema.py
 Requires env:
   NOTION_TOKEN (required)
-  NOTION_DATABASE_ID (required unless NOTION_DATA_SOURCE_ID is set)
-  NOTION_DATA_SOURCE_ID (optional, preferred if using synced DB)
+  NOTION_ITEM_DB_ID (required unless NOTION_ITEM_DS_ID is set)
+  NOTION_ITEM_DS_ID (optional, preferred if using synced DB)
 """
 import sys
 from typing import Dict, Optional
@@ -26,7 +26,7 @@ def fetch_properties(client: Client, data_source_id: Optional[str], database_id:
         except APIResponseError as exc:
             print(f"[warn] data_source fetch failed: {exc}", file=sys.stderr)
     if not database_id:
-        raise RuntimeError("Missing NOTION_DATABASE_ID")
+        raise RuntimeError("Missing NOTION_ITEM_DB_ID")
     return client.databases.retrieve(database_id).get("properties", {})
 
 
@@ -34,13 +34,13 @@ def main() -> int:
     import os
 
     token = os.getenv("NOTION_TOKEN")
-    data_source_id = os.getenv("NOTION_DATA_SOURCE_ID")
-    database_id = os.getenv("NOTION_DATABASE_ID")
+    data_source_id = os.getenv("NOTION_ITEM_DS_ID")
+    database_id = os.getenv("NOTION_ITEM_DB_ID")
     if not token:
         print("Missing NOTION_TOKEN", file=sys.stderr)
         return 1
     if not data_source_id and not database_id:
-        print("Missing NOTION_DATABASE_ID (or NOTION_DATA_SOURCE_ID)", file=sys.stderr)
+        print("Missing NOTION_ITEM_DB_ID (or NOTION_ITEM_DS_ID)", file=sys.stderr)
         return 1
 
     client = Client(auth=token)

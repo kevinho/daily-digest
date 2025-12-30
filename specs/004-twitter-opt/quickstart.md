@@ -1,7 +1,7 @@
 # Quickstart: Twitter 抓取与预处理优化 (004-twitter-opt)
 
 ## 前置
-- 配置 `.env`：`NOTION_TOKEN`, `NOTION_DATABASE_ID/NOTION_DATA_SOURCE_ID`, `CHROME_REMOTE_URL`（已登录调试 Chrome），`LOG_LEVEL`。  
+- 配置 `.env`：`NOTION_TOKEN`, `NOTION_ITEM_DB_ID/NOTION_ITEM_DS_ID`, `CHROME_REMOTE_URL`（已登录调试 Chrome），`LOG_LEVEL`。  
 - 确认 Notion 字段存在：Name/URL/Raw Content/Status/Reason/Source/Canonical URL 等；可运行 `python scripts/check_schema.py`。  
 - 浏览器登录态：启动带 remote debugging 的 Chrome，或确保 Playwright 复用已有 context。
 

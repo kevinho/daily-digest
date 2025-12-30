@@ -8,7 +8,7 @@
 - [X] T001 Create project structure and files per plan: start_chrome.sh, main.py, requirements.txt, src/browser.py, src/notion.py, src/llm.py, src/dedupe.py, src/utils.py, tests/fixtures/. 
 - [X] T002 Add Python toolchain: .python-version/.tool-versions (3.11), venv instructions, pip config if needed.
 - [X] T003 Populate requirements.txt with playwright, trafilatura, notion-client, openai, tenacity, python-dotenv, apscheduler/cron, logging deps.
-- [X] T004 Add .env.example with NOTION_TOKEN, NOTION_DATABASE_ID, OPENAI_API_KEY, TIMEZONE, CHROME_REMOTE_URL, USER_DATA_DIR.
+- [X] T004 Add .env.example with NOTION_TOKEN, NOTION_ITEM_DB_ID, OPENAI_API_KEY, TIMEZONE, CHROME_REMOTE_URL, USER_DATA_DIR.
 - [X] T005 Initialize basic logging/config loader in src/utils.py (env parsing, timezone handling).
 
 ## Phase 2: Foundational (Blocking Prerequisites)

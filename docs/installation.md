@@ -41,8 +41,8 @@ cp .env.example .env
 # Notion 配置 - Inbox 数据库
 # ===================
 NOTION_TOKEN=secret_xxx                 # Notion Integration Token
-NOTION_DATABASE_ID=xxx                  # Inbox 数据库 ID
-NOTION_DATA_SOURCE_ID=xxx               # Inbox Data Source ID（同步数据库用，可选）
+NOTION_ITEM_DB_ID=xxx                   # Inbox 数据库 ID
+NOTION_ITEM_DS_ID=xxx                   # Inbox Data Source ID（同步数据库用，可选）
 
 # ===================
 # Notion 配置 - Report 数据库
@@ -217,7 +217,7 @@ notion_client.errors.APIResponseError: Could not find database
 ```
 
 解决：
-1. 检查 `NOTION_DATABASE_ID` 是否正确
+1. 检查 `NOTION_ITEM_DB_ID` 是否正确
 2. 确保 Integration 已添加到数据库 Connections
 3. 确保 Integration 有足够权限（Read & Update）
 

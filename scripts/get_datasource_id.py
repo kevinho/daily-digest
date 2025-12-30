@@ -70,8 +70,8 @@ def main():
     parser = argparse.ArgumentParser(description="获取 Notion 同步数据库的 Data Source ID")
     parser.add_argument(
         "--database-id",
-        default=os.getenv("NOTION_DATABASE_ID"),
-        help="Notion 数据库 ID（默认从 NOTION_DATABASE_ID 环境变量读取）",
+        default=os.getenv("NOTION_ITEM_DB_ID"),
+        help="Notion 数据库 ID（默认从 NOTION_ITEM_DB_ID 环境变量读取）",
     )
     parser.add_argument(
         "--token",
@@ -81,7 +81,7 @@ def main():
     args = parser.parse_args()
     
     if not args.database_id:
-        print("❌ 请提供 --database-id 或设置 NOTION_DATABASE_ID 环境变量")
+        print("❌ 请提供 --database-id 或设置 NOTION_ITEM_DB_ID 环境变量")
         sys.exit(1)
     
     if not args.token:
@@ -115,12 +115,12 @@ def main():
             print(f"✅ Data Source ID: {ds_id}")
             print()
             print("将以下内容添加到 .env 文件:")
-            print(f"  NOTION_DATA_SOURCE_ID={ds_id}")
+            print(f"  NOTION_ITEM_DS_ID={ds_id}")
         else:
             print("ℹ️  未找到 Data Source ID（可能是普通数据库，无需配置）")
             print()
             print("如果确定是同步数据库，可尝试:")
-            print(f"  NOTION_DATA_SOURCE_ID={args.database_id}")
+            print(f"  NOTION_ITEM_DS_ID={args.database_id}")
             
     except Exception as e:
         print(f"❌ 查询失败: {e}")

@@ -22,8 +22,8 @@ def get_env(name: str, default: str | None = None) -> str:
 def main() -> None:
     load_dotenv()
     token = get_env("NOTION_TOKEN")
-    database_id = get_env("NOTION_DATABASE_ID")
-    data_source_id = os.getenv("NOTION_DATA_SOURCE_ID")
+    database_id = get_env("NOTION_ITEM_DB_ID")
+    data_source_id = os.getenv("NOTION_ITEM_DS_ID")
 
     # 1. 定义字段映射 (Property Names)
     prop_names = {
@@ -51,7 +51,7 @@ def main() -> None:
     }
 
     if not data_source_id:
-        raise RuntimeError("Missing NOTION_DATA_SOURCE_ID (Manage data sources -> Copy data source ID)")
+        raise RuntimeError("Missing NOTION_ITEM_DS_ID (Manage data sources -> Copy data source ID)")
 
     client = Client(auth=token)
     print(f"🔄 正在连接数据库: {database_id} ...")

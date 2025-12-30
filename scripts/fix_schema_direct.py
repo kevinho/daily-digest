@@ -5,8 +5,8 @@ Direct Schema Fixer (Data Source patch version)
 使用 data_sources/{id} 方式更新字段，绕过新版 API 对 databases.update 的限制。
 所需环境变量：
 - NOTION_TOKEN
-- NOTION_DATA_SOURCE_ID  (Manage data sources -> Copy data source ID)
-- NOTION_DATABASE_ID     (仅用于日志，patch 用 data_source_id)
+- NOTION_ITEM_DS_ID  (Manage data sources -> Copy data source ID)
+- NOTION_ITEM_DB_ID     (仅用于日志，patch 用 data_source_id)
 """
 from __future__ import annotations
 
@@ -62,8 +62,8 @@ def build_updates(data_source_id: str) -> Dict[str, Dict]:
 def main() -> None:
     load_dotenv()
     token = get_env("NOTION_TOKEN", required=True)
-    data_source_id = get_env("NOTION_DATA_SOURCE_ID", required=True)
-    database_id = get_env("NOTION_DATABASE_ID")  # optional, for logging
+    data_source_id = get_env("NOTION_ITEM_DS_ID", required=True)
+    database_id = get_env("NOTION_ITEM_DB_ID")  # optional, for logging
 
     client = Client(auth=token)
     updates = build_updates(data_source_id)

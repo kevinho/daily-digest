@@ -10,7 +10,7 @@
 ## Setup
 1) Copy `.env.example` → `.env` (create if absent) and set:
    - `NOTION_TOKEN=<secret>`
-   - `NOTION_DATABASE_ID=<db_id>`
+   - `NOTION_ITEM_DB_ID=<db_id>`
    - `OPENAI_API_KEY=<key>`
    - `TIMEZONE=<e.g., Asia/Shanghai>`
 2) Create venv: `python3 -m venv .venv && source .venv/bin/activate`.

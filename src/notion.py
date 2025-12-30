@@ -41,8 +41,8 @@ class PropertyNames:
 class NotionManager:
     def __init__(self) -> None:
         token = get_env("NOTION_TOKEN", required=True)
-        self.database_id = get_env("NOTION_DATABASE_ID", required=True)
-        self.data_source_id = get_env("NOTION_DATA_SOURCE_ID", required=False)
+        self.database_id = get_env("NOTION_ITEM_DB_ID", required=True)
+        self.data_source_id = get_env("NOTION_ITEM_DS_ID", required=False)
         self.client = Client(auth=token)
 
         self.status = StatusNames(

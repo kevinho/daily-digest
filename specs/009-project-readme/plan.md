@@ -92,8 +92,8 @@
 ```bash
 # Notion Configuration - Inbox DB
 NOTION_TOKEN=secret_xxx
-NOTION_DATABASE_ID=xxx
-NOTION_DATA_SOURCE_ID=xxx        # 可选
+NOTION_ITEM_DB_ID=xxx
+NOTION_ITEM_DS_ID=xxx            # 可选
 
 # Notion Configuration - Report DB
 NOTION_REPORTING_DB_ID=xxx

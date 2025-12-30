@@ -90,5 +90,5 @@ python main.py --digest daily
 |------|------|--------|
 | OPENAI_API_KEY | OpenAI API Key | - |
 | OPENAI_MODEL | 模型名称 | gpt-4o-mini |
-| NOTION_DIGEST_PARENT_ID | Digest 父页面 ID | - |
+| NOTION_REPORTING_DB_ID | Report 数据库 ID | - |
 

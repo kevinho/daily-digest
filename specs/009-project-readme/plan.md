@@ -90,11 +90,14 @@
 完整的 `.env` 模板:
 
 ```bash
-# Notion Configuration
+# Notion Configuration - Inbox DB
 NOTION_TOKEN=secret_xxx
 NOTION_DATABASE_ID=xxx
 NOTION_DATA_SOURCE_ID=xxx        # 可选
-NOTION_DIGEST_PARENT_ID=xxx      # Digest 输出页面
+
+# Notion Configuration - Report DB
+NOTION_REPORTING_DB_ID=xxx
+NOTION_REPORTING_DS_ID=xxx       # 可选
 
 # Chrome Remote Debug
 CHROME_REMOTE_URL=http://localhost:9222

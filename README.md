@@ -128,7 +128,7 @@ Level 1: Items ─────┘ (Inbox DB → status=ready)
 | Tags | Multi-select | 分类标签 |
 | Summary | Text | AI 摘要 |
 | ContentType | Select | 内容类型（html/pdf/image...） |
-| CreatedDate | Created time | 创建时间（用于日报筛选） |
+| CreatedTime | Created time | 创建时间（用于日报筛选） |
 
 ### Report 数据库字段
 

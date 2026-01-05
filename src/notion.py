@@ -36,7 +36,7 @@ class PropertyNames:
     prompt_version: str = "Prompt Version"
     item_type: str = "ItemType"  # Select: url_resource, note_content, empty_invalid
     content_type: str = "ContentType"  # Select: html, pdf, image, video, audio, json, text, binary, unknown
-    created_date: str = "CreatedDate"  # Created time (auto-set by Notion)
+    created_date: str = "CreatedTime"  # Created time (auto-set by Notion)
 
 
 class NotionManager:

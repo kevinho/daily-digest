@@ -47,35 +47,29 @@ class ReportingDBManager:
         """
         Query the Reporting database.
         
-        Prioritizes regular database query, falls back to data_sources if needed.
+        Prioritizes data_source query if available, falls back to database query.
         """
-        query_params = {"filter": filter_obj}
+        body: Dict[str, Any] = {"filter": filter_obj}
         if sorts:
-            query_params["sorts"] = sorts
+            body["sorts"] = sorts
         
-        try:
-            # Always try regular database query first (most reliable)
-            response = self.client.databases.query(
-                database_id=self.database_id,
-                **query_params,
-            )
-            return response.get("results", [])
-        except APIResponseError as e:
-            # If regular query fails and we have a data_source_id, try that
-            if self.data_source_id:
-                logger.warning(f"Regular DB query failed, trying data_sources: {e}")
-                try:
-                    response = self.client.request(
-                        path=f"data_sources/{self.data_source_id}/query",
-                        method="post",
-                        body=query_params,
-                    )
-                    return response.get("results", [])
-                except APIResponseError as e2:
-                    logger.error(f"Data sources query also failed: {e2}")
-                    return []
-            logger.error(f"Notion API error during query: {e}")
-            return []
+        # Try data_source query first if available
+        if self.data_source_id:
+            ds_path = f"data_sources/{self.data_source_id}/query"
+            try:
+                response = self.client.request(path=ds_path, method="post", body=body)
+                return response.get("results", [])
+            except APIResponseError as exc:
+                if exc.code == "invalid_request_url":
+                    # Fallback to database query
+                    pass
+                else:
+                    raise
+        
+        # Use database query via client.request()
+        db_path = f"databases/{self.database_id}/query"
+        response = self.client.request(path=db_path, method="post", body=body)
+        return response.get("results", [])
     
     def find_report(
         self,

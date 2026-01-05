@@ -60,6 +60,7 @@ cp .env.example .env
 ./start_chrome.sh
 
 # 4. 运行
+python -m venv .venv && source .venv/bin/activate
 python main.py process       # 处理新内容
 python main.py report --type daily   # 生成日报
 ```

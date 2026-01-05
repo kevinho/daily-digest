@@ -434,14 +434,18 @@ class NotionManager:
         if not include_private:
             filters.append({"property": self.prop.sensitivity, "select": {"does_not_equal": "private"}})
 
-        if since or until:
-            # Use CreatedDate property (created_time type) for date filtering
-            date_filter: Dict[str, Any] = {"property": self.prop.created_date, "created_time": {}}
-            if since:
-                date_filter["created_time"]["on_or_after"] = since
-            if until:
-                date_filter["created_time"]["on_or_before"] = until
-            filters.append(date_filter)
+        if since:
+            # CreatedTime >= since
+            filters.append({
+                "property": self.prop.created_date,
+                "created_time": {"on_or_after": since}
+            })
+        if until:
+            # CreatedTime <= until
+            filters.append({
+                "property": self.prop.created_date,
+                "created_time": {"on_or_before": until}
+            })
 
         resp = self._query({"filter": {"and": filters}})
         return [self._simplify_page(p) for p in resp.get("results", [])]

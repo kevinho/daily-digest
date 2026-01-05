@@ -36,6 +36,7 @@ class PropertyNames:
     prompt_version: str = "Prompt Version"
     item_type: str = "ItemType"  # Select: url_resource, note_content, empty_invalid
     content_type: str = "ContentType"  # Select: html, pdf, image, video, audio, json, text, binary, unknown
+    created_date: str = "CreatedDate"  # Created time (auto-set by Notion)
 
 
 class NotionManager:
@@ -212,6 +213,12 @@ class NotionManager:
             if isinstance(select_val, dict):
                 content_type_value = select_val.get("name")
         
+        # Extract created_date (created_time type property)
+        created_date_prop = props.get(self.prop.created_date, {})
+        created_date_value = None
+        if isinstance(created_date_prop, dict) and "created_time" in created_date_prop:
+            created_date_value = created_date_prop.get("created_time")
+        
         # Generate page link
         page_id = page.get("id", "")
         page_link = f"https://notion.so/{page_id.replace('-', '')}" if page_id else ""
@@ -228,6 +235,7 @@ class NotionManager:
             "source": source_value,
             "item_type": item_type_value,
             "content_type": content_type_value,
+            "created_date": created_date_value,
             "page_link": page_link,
             "raw": page,
         }
@@ -410,7 +418,16 @@ class NotionManager:
         until: Optional[str],
         include_private: bool = False,
     ) -> List[Dict[str, Any]]:
-        """Fetch items ready for digest, with optional date window and sensitivity gating."""
+        """Fetch items ready for digest, with optional date window and sensitivity gating.
+        
+        Args:
+            since: ISO datetime string for start of date window (inclusive)
+            until: ISO datetime string for end of date window (inclusive)
+            include_private: Whether to include items marked as private
+            
+        Note:
+            Filters by CreatedDate property (custom created_time field in schema).
+        """
         filters: List[Dict[str, Any]] = [
             self._status_filter(self.status.ready),
         ]
@@ -418,8 +435,8 @@ class NotionManager:
             filters.append({"property": self.prop.sensitivity, "select": {"does_not_equal": "private"}})
 
         if since or until:
-            # Assume Created time for now; adjust to a date property if schema differs
-            date_filter: Dict[str, Any] = {"timestamp": "created_time", "created_time": {}}
+            # Use CreatedDate property (created_time type) for date filtering
+            date_filter: Dict[str, Any] = {"property": self.prop.created_date, "created_time": {}}
             if since:
                 date_filter["created_time"]["on_or_after"] = since
             if until:
@@ -435,7 +452,7 @@ class NotionManager:
         status_filter: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Fetch items created on a specific date.
+        Fetch items created on a specific date (using CreatedDate property).
         
         Args:
             target_date: The target date (datetime.date object)
@@ -452,14 +469,14 @@ class NotionManager:
         else:
             date_str = str(target_date)
         
-        # Build date filter for created_time
+        # Build date filter using CreatedDate property
         filters: List[Dict[str, Any]] = [
             {
-                "timestamp": "created_time",
+                "property": self.prop.created_date,
                 "created_time": {"on_or_after": f"{date_str}T00:00:00"},
             },
             {
-                "timestamp": "created_time",
+                "property": self.prop.created_date,
                 "created_time": {"on_or_before": f"{date_str}T23:59:59"},
             },
         ]

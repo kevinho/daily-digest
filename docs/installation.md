@@ -118,6 +118,7 @@ curl http://localhost:9222/json/version
 | ContentType | Select | 内容类型 |
 | ItemType | Select | 条目类型 |
 | Files | Files | 附件/截图 |
+| CreatedDate | Created time | 创建时间（用于日报筛选） |
 
 Status 字段建议配置：
 - `To Read` - 待处理
